@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="en" class="h-full">
+ <head>
+  <script src="../services/app.js"></script>
+  <script>
+    if (!window.SDRS?.Auth?.requireRole('admin', '../login.html')) {
+      // Redirect handled by session guard.
+    }
+  </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SDRS - Pipeline Details</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Inter', sans-serif; }
+    body { background: #F8FAFC; }
+    .card-shadow { box-shadow: 0 8px 32px rgba(15, 35, 65, 0.12); }
+    .soft-shadow { box-shadow: 0 4px 16px rgba(15, 35, 65, 0.08); }
+    .badge-pill { display: inline-flex; align-items: center; justify-content: center; border-radius: 9999px; padding: 0.35rem 0.8rem; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+    .print-area { display: none; }
+    @page { size: A4 landscape; margin: 10mm; }
+    @media print {
+      body { background: white !important; color: #000 !important; font-size: 8pt; }
+      header, .no-print, .controls-panel, .action-bar, .print-hidden { display: none !important; }
+      main > *:not(.print-area):not(#pipelinePrintSection) { display: none !important; }
+      .print-area { display: block !important; margin-bottom: 0.5rem; }
+      #pipelinePrintSection { display: block !important; margin: 0; padding: 0; border: none !important; box-shadow: none !important; }
+      #pipelinePrintSection > div:first-child { padding: 0; border: none !important; background: none !important; }
+      table { width: 100% !important; border-collapse: collapse !important; page-break-inside: auto; font-size: 7pt; }
+      thead { display: table-header-group; }
+      tr { page-break-inside: avoid; page-break-after: auto; }
+      th, td { border: 1px solid #000 !important; padding: 0.3rem 0.2rem !important; }
+      th { background: #F1F5F9 !important; font-weight: bold; }
+      .badge-pill, .no-print, button, input, select { display: none !important; }
+      .text-sm { font-size: 7pt !important; }
+    }
+    table { border-collapse: collapse; width: 100%; }
+    table th, table td { border: 1px solid #E2E8F0; padding: 0.85rem 0.9rem; }
+    table th { background: #F1F5F9; position: sticky; top: 0; z-index: 5; }
+    tbody tr:hover { background: #EFF6FF; }
+  </style>
+ </head>
+ <body class="h-full">
+   <header class="bg-white border-b border-slate-200 sticky top-0 z-40">
+     <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
+       <div class="flex items-center gap-3">
+         <button onclick="goBack()" class="text-slate-500 hover:text-navy transition-colors rounded-full p-2 bg-slate-100 hover:bg-slate-200 no-print">
+           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+         </button>
+         <div>
+           <p class="text-xs uppercase tracking-[0.35em] text-teal font-bold">Pipeline Control</p>
+           <h1 class="text-2xl font-extrabold text-navy">Pipeline Details</h1>
+         </div>
+       </div>
+       <div class="flex items-center gap-3 no-print">
+         <button onclick="printRecords()" class="px-4 py-2 rounded-xl bg-navy text-white text-sm font-semibold hover:bg-slate-900 transition">Print Record</button>
+         <button onclick="exportPDF()" class="px-4 py-2 rounded-xl bg-teal text-white text-sm font-semibold hover:bg-teal-700 transition">Export PDF</button>
+       </div>
+     </div>
+   </header>
+
+   <main class="max-w-7xl mx-auto px-6 py-6">
+     <div class="print-area bg-white p-4 rounded-3xl border border-slate-200 mb-6">
+       <div class="flex items-center justify-between gap-3">
+         <div>
+           <h2 class="text-lg font-bold text-slate-900">SDRS Pipeline Report</h2>
+           <p class="text-sm text-slate-600">Generated on <span id="printDate"></span></p>
+         </div>
+         <div class="text-right">
+           <p class="text-sm text-slate-600">Admin View</p>
+         </div>
+       </div>
+     </div>
+
+     <section class="mb-6">
+       <div class="bg-white p-6 rounded-3xl border border-slate-200 card-shadow mb-6">
+         <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4 controls-panel no-print">
+           <div class="flex-1 min-w-0">
+             <label class="block text-xs font-bold uppercase tracking-[0.2em] text-slate-500 mb-2">Search orders</label>
+             <input id="searchInput" type="text" placeholder="Search by outlet, driver, transfer, remark" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-teal focus:ring-2 focus:ring-teal/20" oninput="applyFilters()">
+           </div>
+           <div class="flex gap-2 flex-wrap">
+             <button class="filter-btn px-4 py-2 rounded-2xl border border-slate-200 bg-slate-50 text-slate-700 text-sm font-semibold hover:bg-slate-100" onclick="setFilter('all')">All</button>
+             <button class="filter-btn px-4 py-2 rounded-2xl border border-slate-200 bg-emerald-50 text-emerald-700 text-sm font-semibold hover:bg-emerald-100" onclick="setFilter('completed')">Completed</button>
+             <button class="filter-btn px-4 py-2 rounded-2xl border border-slate-200 bg-amber-50 text-amber-700 text-sm font-semibold hover:bg-amber-100" onclick="setFilter('pending')">Pending</button>
+             <button class="filter-btn px-4 py-2 rounded-2xl border border-slate-200 bg-red-50 text-red-700 text-sm font-semibold hover:bg-red-100" onclick="setFilter('issues')">Issues</button>
+             <button class="filter-btn px-4 py-2 rounded-2xl border border-slate-200 bg-slate-50 text-slate-700 text-sm font-semibold hover:bg-slate-100" onclick="setFilter('rejected')">Rejected</button>
+           </div>
+         </div>
+       </div>
+       <div class="grid grid-cols-1 xl:grid-cols-[1fr,360px] gap-6">
+         <div class="bg-white p-6 rounded-3xl border border-slate-200 card-shadow">
+           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+             <div class="bg-slate-50 p-4 rounded-3xl border border-slate-200">
+               <p class="text-xs uppercase tracking-[0.25em] text-slate-500 mb-2">Total Records</p>
+               <p id="summaryTotal" class="text-3xl font-extrabold text-navy">0</p>
+             </div>
+             <div class="bg-amber-50 p-4 rounded-3xl border border-amber-200">
+               <p class="text-xs uppercase tracking-[0.25em] text-amber-700 mb-2">Pending</p>
+               <p id="summaryPending" class="text-3xl font-extrabold text-amber-800">0</p>
+             </div>
+             <div class="bg-emerald-50 p-4 rounded-3xl border border-emerald-200">
+               <p class="text-xs uppercase tracking-[0.25em] text-emerald-700 mb-2">Completed</p>
+               <p id="summaryCompleted" class="text-3xl font-extrabold text-emerald-800">0</p>
+             </div>
+             <div class="bg-red-50 p-4 rounded-3xl border border-red-200">
+               <p class="text-xs uppercase tracking-[0.25em] text-red-700 mb-2">Issues</p>
+               <p id="summaryIssues" class="text-3xl font-extrabold text-red-800">0</p>
+             </div>
+           </div>
+         </div>
+         <div class="bg-white p-6 rounded-3xl border border-slate-200 card-shadow">
+           <div class="grid grid-cols-1 gap-4 mb-5">
+             <div class="bg-slate-50 p-6 rounded-3xl border border-slate-200 h-full">
+               <p class="text-xs uppercase tracking-[0.25em] text-slate-500 mb-2">Current Date</p>
+               <p id="currentDate" class="text-3xl font-extrabold text-navy">--</p>
+             </div>
+             <div class="bg-slate-50 p-6 rounded-3xl border border-slate-200 h-full">
+               <p class="text-xs uppercase tracking-[0.25em] text-slate-500 mb-2">Current Time</p>
+               <p id="currentTime" class="text-5xl font-extrabold text-teal">--</p>
+             </div>
+           </div>
+           <p class="text-sm text-slate-600 leading-7">Current time and date for pipeline review.</p>
+         </div>
+       </div>
+     </section>
+
+     <section id="pipelinePrintSection" class="bg-white rounded-3xl border border-slate-200 overflow-hidden card-shadow">
+       <div class="p-6 border-b border-slate-200 bg-slate-50">
+         <div class="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+           <div>
+             <h3 class="text-lg font-bold text-navy">Full Pipeline Table</h3>
+             <p class="text-sm text-slate-600 mt-1">Sorted by most recent update, with live filtering and search.</p>
+           </div>
+           <div class="grid gap-3 sm:grid-cols-3 w-full lg:w-auto no-print">
+             <div>
+               <label class="block text-xs font-bold uppercase tracking-[0.2em] text-slate-500 mb-2">Date filter</label>
+               <select id="dateFilterType" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none" onchange="setDateFilterType(this.value)">
+                 <option value="all">All</option>
+                 <option value="daily">Daily</option>
+                 <option value="weekly">Weekly</option>
+                 <option value="monthly">Monthly</option>
+               </select>
+             </div>
+             <div id="dateRangeControls" class="hidden">
+               <label class="block text-xs font-bold uppercase tracking-[0.2em] text-slate-500 mb-2">From / To</label>
+               <div class="grid grid-cols-2 gap-2">
+                 <input id="dateStart" type="date" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none" onchange="applyFilters()">
+                 <input id="dateEnd" type="date" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none" onchange="applyFilters()">
+               </div>
+             </div>
+             <div id="monthControls" class="hidden">
+               <label class="block text-xs font-bold uppercase tracking-[0.2em] text-slate-500 mb-2">Month / Year</label>
+               <div class="grid grid-cols-2 gap-2">
+                 <select id="monthSelect" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none" onchange="applyFilters()"></select>
+                 <select id="yearSelect" class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none" onchange="applyFilters()"></select>
+               </div>
+             </div>
+             <div class="flex items-end justify-end">
+               <button type="button" onclick="printRecords()" class="w-full rounded-2xl border border-slate-200 bg-slate-950 text-white text-sm font-semibold hover:bg-slate-800 px-4 py-3">Print</button>
+             </div>
+           </div>
+         </div>
+       </div>
+       <div class="overflow-x-auto">
+         <table class="min-w-full text-left text-sm text-slate-700">
+           <thead>
+             <tr>
+               <th>Outlet ID</th>
+               <th>Outlet Name</th>
+               <th>Driver</th>
+               <th>XFER / Transfer</th>
+               <th>Total Boxes</th>
+               <th>Delivery Status</th>
+               <th>Outlet Status</th>
+               <th>Remarks / Complaints</th>
+               <th>Admin Reply</th>
+               <th>Created</th>
+               <th>Updated</th>
+             </tr>
+           </thead>
+           <tbody id="pipelineTableBody"></tbody>
+         </table>
+       </div>
+     </section>
+   </main>
+
+   <script>
+     const filters = {
+       type: 'all',
+       query: '',
+       dateType: 'all',
+       dateStart: '',
+       dateEnd: '',
+       month: '',
+       year: ''
+     };
+
+     function goBack() {
+       window.location.href = 'index.html';
+     }
+
+     function setDateFilterType(type) {
+       filters.dateType = type;
+       filters.dateStart = '';
+       filters.dateEnd = '';
+       filters.month = '';
+       filters.year = '';
+       document.getElementById('dateStart').value = '';
+       document.getElementById('dateEnd').value = '';
+       document.getElementById('monthSelect').value = '';
+       document.getElementById('yearSelect').value = '';
+
+       const rangeControls = document.getElementById('dateRangeControls');
+       const monthControls = document.getElementById('monthControls');
+
+       rangeControls.classList.toggle('hidden', type === 'monthly');
+       monthControls.classList.toggle('hidden', type !== 'monthly');
+       if (type === 'monthly') {
+         monthControls.classList.remove('hidden');
+         rangeControls.classList.add('hidden');
+       } else if (type === 'all') {
+         monthControls.classList.add('hidden');
+         rangeControls.classList.add('hidden');
+       } else {
+         monthControls.classList.add('hidden');
+         rangeControls.classList.remove('hidden');
+       }
+       applyFilters();
+     }
+
+     function populateMonthYearControls() {
+       const monthSelect = document.getElementById('monthSelect');
+       const yearSelect = document.getElementById('yearSelect');
+       if (!monthSelect || !yearSelect) return;
+       const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+       monthSelect.innerHTML = '<option value="">Month</option>' + months.map((name, index) => `<option value="${index + 1}">${name}</option>`).join('');
+
+       const currentYear = new Date().getFullYear();
+       const startYear = Math.max(2022, currentYear - 3);
+       let yearOptions = '<option value="">Year</option>';
+       for (let year = currentYear; year >= startYear; year -= 1) {
+         yearOptions += `<option value="${year}">${year}</option>`;
+       }
+       yearSelect.innerHTML = yearOptions;
+     }
+
+     function getDateValue(order) {
+       const value = order.createdDate || order.createdAt || order.time || order.lastUpdated || order.updatedAt || order.modifiedAt;
+       const date = new Date(value);
+       return Number.isNaN(date.getTime()) ? null : date;
+     }
+
+     function filterByDate(order) {
+       if (filters.dateType === 'all') return true;
+       const date = getDateValue(order);
+       if (!date) return false;
+
+       if (filters.dateType === 'monthly') {
+         if (!filters.month || !filters.year) return true;
+         const month = Number(filters.month);
+         const year = Number(filters.year);
+         return date.getFullYear() === year && (date.getMonth() + 1) === month;
+       }
+
+       const start = filters.dateStart ? new Date(filters.dateStart + 'T00:00:00') : null;
+       const end = filters.dateEnd ? new Date(filters.dateEnd + 'T23:59:59') : null;
+       if (!start && !end) return true;
+       if (start && end) return date >= start && date <= end;
+       if (start) return date >= start;
+       return date <= end;
+     }
+
+     function getOrders() {
+       const manager = window.SDRSStateManager;
+       if (manager) {
+         return manager.getState('adminGlobalPipeline');
+       }
+       return JSON.parse(localStorage.getItem('adminGlobalPipeline') || localStorage.getItem('sdrs_main_orders') || '[]');
+     }
+
+     function updateCurrentDateTime() {
+       const now = new Date();
+       const currentDateEl = document.getElementById('currentDate');
+       const currentTimeEl = document.getElementById('currentTime');
+       if (!currentDateEl || !currentTimeEl) return;
+       const options = { timeZone: 'Asia/Kuala_Lumpur', hour12: false };
+       const dateOptions = { ...options, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+       const timeOptions = { ...options, hour: '2-digit', minute: '2-digit', second: '2-digit' };
+       currentDateEl.textContent = new Intl.DateTimeFormat('en-GB', dateOptions).format(now);
+       currentTimeEl.textContent = new Intl.DateTimeFormat('en-GB', timeOptions).format(now);
+     }
+
+     function getComplaints() {
+       const manager = window.SDRSStateManager;
+       let complaints = manager ? manager.getState('complaints') : (JSON.parse(localStorage.getItem('sdrs_complaints')) || []);
+       
+       // Deduplicate: keep only latest complaint per orderId + xfer combination
+       // Prioritize complaints that have responses
+       const seen = {};
+       const deduped = [];
+       
+       complaints.forEach((c) => {
+           const key = `${c.orderId || c.transferId || 'unknown'}_${c.xfer || c.transfer || 'general'}`;
+           if (!seen[key]) {
+               seen[key] = c;
+               deduped.push(c);
+           } else {
+               // If new complaint has a response and current doesn't, replace
+               if (c.response && !seen[key].response) {
+                   const idx = deduped.findIndex(comp => comp === seen[key]);
+                   if (idx !== -1) deduped[idx] = c;
+                   seen[key] = c;
+               }
+               // Otherwise keep the one with response, or newer if neither has response
+               else if (!c.response && !seen[key].response && c.time > seen[key].time) {
+                   const idx = deduped.findIndex(comp => comp === seen[key]);
+                   if (idx !== -1) deduped[idx] = c;
+                   seen[key] = c;
+               }
+           }
+       });
+       
+       // Update localStorage if duplicates were removed
+       if (deduped.length !== complaints.length) {
+               if (window.SDRSStateManager) {
+                   window.SDRSStateManager.setState('complaints', deduped);
+               } else {
+                   localStorage.setItem('sdrs_complaints', JSON.stringify(deduped));
+               }
+       
+       return deduped;
+     }
+
+     function formatDateTime(value) {
+       if (!value) return '--';
+       const date = new Date(value);
+       return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+     }
+
+     function getOrderLabel(status) {
+       if (!status) return 'Unknown';
+       const normalized = status.toString().toUpperCase();
+       switch (normalized) {
+         case 'COMPLETED': return 'Completed';
+         case 'CREATED':
+         case 'PENDING_DRIVER':
+         case 'PENDING': return 'Pending';
+         case 'VERIFIED_BY_DRIVER':
+         case 'VERIFIED BY DRIVER': return 'In Transit';
+         case 'DISCREPANCY': return 'Driver Issue';
+         case 'MISMATCH': return 'Outlet Mismatch';
+         default: return normalized;
+       }
+     }
+
+     function getStatusBadge(status) {
+       const normalized = (status || '').toString().toUpperCase();
+       if (normalized === 'COMPLETED') return '<span class="badge-pill bg-emerald-100 text-emerald-800">Completed</span>';
+       if (normalized === 'CREATED' || normalized === 'PENDING' || normalized === 'PENDING_DRIVER') return '<span class="badge-pill bg-amber-100 text-amber-800">Pending</span>';
+       if (normalized === 'VERIFIED_BY_DRIVER' || normalized === 'VERIFIED BY DRIVER') return '<span class="badge-pill bg-sky-100 text-sky-800">In Transit</span>';
+       if (normalized === 'DISCREPANCY') return '<span class="badge-pill bg-red-100 text-red-800">Driver Issue</span>';
+       if (normalized === 'MISMATCH') return '<span class="badge-pill bg-red-100 text-red-800">Outlet Mismatch</span>';
+       return `<span class="badge-pill bg-slate-100 text-slate-800">${normalized}</span>`;
+     }
+
+     function getOutletStatus(order) {
+       const normalized = (order.status || '').toString().toUpperCase();
+       if (normalized === 'COMPLETED') return 'Received';
+       if (normalized === 'CREATED' || normalized === 'PENDING' || normalized === 'PENDING_DRIVER' || normalized === 'VERIFIED_BY_DRIVER' || normalized === 'VERIFIED BY DRIVER') return 'Not Received';
+       return order.outletStatus || 'Not Received';
+     }
+
+     function normalizeKey(value) {
+       return value === null || value === undefined ? '' : String(value).trim();
+     }
+
+     function complaintMatchesOrder(order, complaint) {
+       const orderKeys = [order.id, order.orderId, order.transferId, order.xfer].map(normalizeKey).filter(Boolean);
+       const complaintKeys = [complaint.orderId, complaint.transferId, complaint.xfer, complaint.transfer].map(normalizeKey).filter(Boolean);
+       return orderKeys.some(ok => complaintKeys.includes(ok));
+     }
+
+     function getOrderComplaints(order) {
+       return getComplaints().filter(c => complaintMatchesOrder(order, c));
+     }
+
+     function groupComplaintsByXfer(complaints) {
+       return complaints.reduce((groups, complaint) => {
+         const xferGroup = normalizeKey(complaint.xfer || complaint.transfer) || 'General';
+         if (!groups[xferGroup]) groups[xferGroup] = [];
+         groups[xferGroup].push(complaint);
+         return groups;
+       }, {});
+     }
+
+     function renderGroupedComplaintHtml(order, includeResponses = false) {
+       const complaints = getOrderComplaints(order);
+       if (!complaints.length) return `<span class="text-slate-500">No remarks</span>`;
+
+       const grouped = groupComplaintsByXfer(complaints);
+       return Object.entries(grouped).map(([xfer, items]) => `
+         <div class="mb-4 rounded-3xl border border-slate-200 bg-slate-50 p-3">
+           <div class="text-[11px] uppercase tracking-[0.35em] font-bold text-slate-500 mb-2">${xfer}</div>
+           ${items.map(item => `
+             <div class="mb-3 rounded-2xl border border-slate-200 bg-white p-3 text-xs text-slate-700">
+               <div class="font-semibold text-slate-900">${item.remark || 'No outward remark'}</div>
+               <div class="mt-1 text-[11px] text-slate-500">Status: ${item.status || 'NEW'}</div>
+               ${includeResponses && item.response ? `
+                 <div class="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                   <div class="text-[10px] uppercase tracking-[0.35em] font-bold text-slate-700 mb-1">Admin Reply</div>
+                   <div class="text-[11px] text-slate-700">${item.response}</div>
+                   <div class="mt-1 text-[11px] text-slate-500">By ${item.responseBy || 'Admin'}${item.responseTime ? ' • ' + formatDateTime(item.responseTime) : ''}</div>
+                 </div>
+               ` : ''}
+             </div>
+           `).join('')}
+         </div>
+       `).join('');
+     }
+
+     function getComplaintRows(order) {
+       return renderGroupedComplaintHtml(order, false);
+     }
+
+     function getReplyText(order) {
+       const complaints = getOrderComplaints(order).filter(c => c.response);
+       if (!complaints.length) return '<span class="text-slate-500">No admin reply</span>';
+       const grouped = groupComplaintsByXfer(complaints);
+       return Object.entries(grouped).map(([xfer, items]) => `
+         <div class="mb-4 rounded-3xl border border-slate-200 bg-slate-50 p-3">
+           <div class="text-[11px] uppercase tracking-[0.35em] font-bold text-slate-500 mb-2">${xfer}</div>
+           ${items.map(item => `
+             <div class="mb-3 rounded-2xl border border-slate-200 bg-white p-3 text-xs text-slate-700">
+               <div class="font-semibold text-slate-900">${item.response}</div>
+               <div class="mt-1 text-[11px] text-slate-500">By ${item.responseBy || 'Admin'}${item.responseTime ? ' • ' + formatDateTime(item.responseTime) : ''}</div>
+             </div>
+           `).join('')}
+         </div>
+       `).join('');
+     }
+
+     function getOutletId(order) {
+       return order.outletId || order.selectedOutlet?.id || order.destinationOutletId || order.outlet || order.xfer || 'N/A';
+     }
+
+     function matchesFilter(order, query) {
+       const orderText = [
+         getOutletId(order),
+         order.outletName,
+         order.driverName,
+         order.transferId,
+         order.xfer,
+         order.orderId,
+         (order.status || ''),
+         (order.outletStatus || ''),
+         (order.remarks || ''),
+       ].filter(Boolean).join(' ').toLowerCase();
+       const complaintText = getOrderComplaints(order).map(c => [c.remark, c.response, c.xfer, c.status, c.responseBy].filter(Boolean).join(' ')).join(' ').toLowerCase();
+       return orderText.includes(query.toLowerCase()) || complaintText.includes(query.toLowerCase());
+     }
+
+     function applyFilters() {
+       filters.query = document.getElementById('searchInput').value || '';
+       filters.dateStart = document.getElementById('dateStart').value || '';
+       filters.dateEnd = document.getElementById('dateEnd').value || '';
+       filters.month = document.getElementById('monthSelect').value || '';
+       filters.year = document.getElementById('yearSelect').value || '';
+       renderTable();
+     }
+
+     function setFilter(type) {
+       filters.type = type;
+       document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('border-teal', 'bg-teal-100', 'text-teal-800'));
+       const selected = Array.from(document.querySelectorAll('.filter-btn')).find(btn => btn.textContent.toLowerCase().includes(type));
+       if (selected) {
+         selected.classList.add('border-teal', 'bg-teal-100', 'text-teal-800');
+       }
+       renderTable();
+     }
+
+     function filterOrder(order) {
+       if (filters.type === 'completed') return (order.status || '').toString().toUpperCase() === 'COMPLETED';
+       if (filters.type === 'pending') return ['CREATED', 'PENDING', 'PENDING_DRIVER'].includes((order.status || '').toString().toUpperCase()) || ['VERIFIED_BY_DRIVER', 'VERIFIED BY DRIVER'].includes((order.status || '').toString().toUpperCase());
+       if (filters.type === 'issues') {
+         const complaints = getComplaints().filter(item => item.orderId === order.id || item.transferId === order.transferId || item.xfer === order.xfer);
+         return order.hasIssue || complaints.length > 0;
+       }
+       if (filters.type === 'rejected') return ['DISCREPANCY', 'MISMATCH', 'REJECTED'].includes((order.status || '').toString().toUpperCase());
+       return true;
+     }
+
+     function renderSummary(filteredOrders, totalOrders) {
+       const visibleCount = filteredOrders.length;
+       const completed = filteredOrders.filter(o => (o.status || '').toString().toUpperCase() === 'COMPLETED').length;
+       const pending = filteredOrders.filter(o => ['CREATED', 'PENDING', 'PENDING_DRIVER', 'VERIFIED_BY_DRIVER', 'VERIFIED BY DRIVER'].includes((o.status || '').toString().toUpperCase())).length;
+       const issues = filteredOrders.filter(o => {
+         const complaints = getComplaints().filter(item => item.orderId === o.id || item.transferId === o.transferId || item.xfer === o.xfer);
+         return o.hasIssue || complaints.length > 0;
+       }).length;
+
+       document.getElementById('summaryTotal').textContent = totalOrders;
+       document.getElementById('summaryCompleted').textContent = completed;
+       document.getElementById('summaryPending').textContent = pending;
+       document.getElementById('summaryIssues').textContent = issues;
+       document.getElementById('highlightVisible').textContent = visibleCount;
+       document.getElementById('highlightCompleted').textContent = completed;
+       document.getElementById('highlightPending').textContent = pending;
+       document.getElementById('highlightIssues').textContent = issues;
+       document.getElementById('highlightDescription').textContent = visibleCount === totalOrders
+         ? 'Showing all active orders.'
+         : `Showing ${visibleCount} of ${totalOrders} orders after filtering/search.`;
+     }
+
+     function renderTable() {
+       const orders = getOrders().sort((a, b) => {
+         const ta = a.lastUpdated || a.createdDate || 0;
+         const tb = b.lastUpdated || b.createdDate || 0;
+         return tb - ta;
+       });
+       const filtered = orders.filter(order => {
+         const pass = filterOrder(order);
+         const match = filters.query ? matchesFilter(order, filters.query) : true;
+         const passDate = filterByDate(order);
+         return pass && match && passDate;
+       });
+       const tbody = document.getElementById('pipelineTableBody');
+       tbody.innerHTML = filtered.length ? filtered.map(order => {
+         return `
+           <tr class="align-top">
+             <td class="align-top text-sm text-slate-700">${getOutletId(order)}</td>
+             <td class="align-top text-sm text-slate-700">${order.outletName || 'N/A'}</td>
+             <td class="align-top text-sm text-slate-700">${order.driverName || 'N/A'}</td>
+             <td class="align-top text-sm text-slate-700">${order.transferId || order.xfer || 'N/A'}</td>
+            <td class="align-top text-sm text-slate-700">${order.totalPackages || order.boxes || order.total || '0'}</td>
+             <td class="align-top text-sm text-slate-700">${getStatusBadge(order.status)}</td>
+             <td class="align-top text-sm text-slate-700">${getOutletStatus(order)}</td>
+             <td class="align-top text-sm text-slate-700">${getComplaintRows(order)}</td>
+             <td class="align-top text-sm text-slate-700">${getReplyText(order)}</td>
+             <td class="align-top text-sm text-slate-700">${formatDateTime(order.createdDate || order.createdAt || order.time)}</td>
+             <td class="align-top text-sm text-slate-700">${formatDateTime(order.lastUpdated || order.updatedAt || order.modifiedAt)}</td>
+           </tr>
+         `;
+       }).join('') : '<tr><td class="px-6 py-8 text-sm text-slate-500 text-center" colspan="11">No matching records found.</td></tr>';
+       tbody.innerHTML = filtered.length ? tbody.innerHTML : tbody.innerHTML;
+       renderSummary(filtered, orders.length);
+       document.getElementById('printDate').textContent = new Date().toLocaleString();
+     }
+
+     function printRecords() {
+       window.print();
+     }
+
+     function exportPDF() {
+       window.print();
+     }
+
+     document.addEventListener('DOMContentLoaded', () => {
+       populateMonthYearControls();
+       setDateFilterType('all');
+       renderTable();
+       setFilter('all');
+       updateCurrentDateTime();
+       setInterval(updateCurrentDateTime, 1000);
+     });
+
+     // Ensure time updates in case DOMContentLoaded already fired before listener attached
+     updateCurrentDateTime();
+     setInterval(updateCurrentDateTime, 1000);
+
+     window.addEventListener('storage', (e) => {
+       if (e.key === 'adminGlobalPipeline' || e.key === 'sdrs_main_orders' || e.key === 'sdrs_complaints' || e.key === 'complaints' || e.key === null) {
+         renderTable();
+       }
+     });
+
+     window.addEventListener('local_state_updated', renderTable);
+     window.addEventListener('state_sync', renderTable);
+   </script>
+ </body>
+</html>

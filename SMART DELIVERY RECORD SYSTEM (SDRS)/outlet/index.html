@@ -1,0 +1,352 @@
+﻿<!doctype html>
+<html lang="en" class="h-full antialiased">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SDRS - Outlet Receiver</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .card-shadow { box-shadow: 0 24px 60px rgba(15, 35, 65, 0.08); }
+    .fade-up { animation: fadeIn 0.5s ease both; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: '#0F2341',
+            purple: '#7C3AED',
+            corporate: {
+              50: '#f8fafc',
+              100: '#f1f5f9'
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-900">
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+    <div class="max-w-3xl mx-auto px-4 h-16 flex items-center gap-3">
+      <a href="select-outlet.html" class="text-slate-400 hover:text-slate-900 transition-colors">
+        <i data-lucide="arrow-left" class="w-5 h-5"></i>
+      </a>
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-3xl bg-gradient-to-br from-purple-600 to-cyan-500 text-white flex items-center justify-center shadow-sm">
+          <span class="text-base font-extrabold">AQ</span>
+        </div>
+        <div>
+          <h1 class="text-lg font-extrabold tracking-tight text-slate-950">Outlet Receiver</h1>
+          <p class="text-[10px] uppercase font-bold tracking-[0.35em] text-purple-500 mt-1">END FULFILLMENT</p>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-3xl mx-auto p-4 space-y-6 fade-up">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <i data-lucide="box" class="w-5 h-5 text-purple-500"></i>
+        <h2 class="text-lg font-bold text-slate-950">Income Deliveries</h2>
+      </div>
+      <div class="inline-flex items-center rounded-full bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700">
+        <span id="taskCount">0</span> Arriving
+      </div>
+    </div>
+
+    <div id="ordersContainer" class="space-y-5"></div>
+
+    <div id="historySection" class="space-y-5">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i data-lucide="clock" class="w-5 h-5 text-slate-500"></i>
+          <h2 class="text-lg font-bold text-slate-950">Delivery History</h2>
+        </div>
+        <div id="historyCount" class="inline-flex items-center rounded-full bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700">
+          0 Records
+        </div>
+      </div>
+      <div id="historyContainer" class="space-y-5"></div>
+      <div id="historyEmptyState" class="text-sm text-slate-500">No completed deliveries recorded for this outlet yet.</div>
+    </div>
+
+    <div id="emptyState" class="hidden flex-col items-center justify-center py-12 text-center w-full">
+      <div class="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+        <i data-lucide="coffee" class="w-8 h-8 text-slate-300"></i>
+      </div>
+      <h3 class="text-lg font-bold text-slate-950 mb-1">Queue Empty</h3>
+      <p class="text-slate-500 text-sm max-w-[260px]">No pending arrivals detected for this branch.</p>
+    </div>
+  </main>
+
+  <script src="../shared/state.js"></script>
+  <script>
+    lucide.createIcons();
+
+    function formatTimeLabel(timestamp) {
+      if (!timestamp) return '--';
+      return new Date(timestamp).toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+
+    function getLatestOrderCommunication(orderId) {
+      const manager = window.SDRSStateManager;
+      const complaints = manager ? manager.getState('complaints') : JSON.parse(localStorage.getItem('sdrs_complaints') || '[]');
+      return complaints
+        .filter(c => String(c.orderId) === String(orderId))
+        .sort((a, b) => (b.time || 0) - (a.time || 0))[0] || null;
+    }
+
+    function renderOrders() {
+      const container = document.getElementById('ordersContainer');
+      const emptyState = document.getElementById('emptyState');
+      const countEl = document.getElementById('taskCount');
+      container.innerHTML = '';
+
+      const outletId = new URLSearchParams(window.location.search).get('outletId');
+      const manager = window.SDRSStateManager;
+      const incomingOrders = manager ? manager.getState('outletIncomingQueue') : JSON.parse(localStorage.getItem('outletIncomingQueue') || '[]');
+      const arrivingOrders = (incomingOrders || []).filter(order => {
+        return String(order.outletId || '').trim() === String(outletId || '').trim() &&
+               String(order.status || '').toUpperCase() === 'VERIFIED_BY_DRIVER';
+      });
+
+      countEl.textContent = arrivingOrders.length;
+      renderHistory(outletId);
+      if (arrivingOrders.length === 0) {
+        emptyState.classList.remove('hidden');
+        emptyState.classList.add('flex');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+      emptyState.classList.remove('flex');
+
+      arrivingOrders.forEach(order => {
+        const transferId = order.id || 'UNKNOWN';
+        const outletName = order.outletName || order.outlet || 'Unknown Outlet';
+        const xferItems = Array.isArray(order.xfers) ? order.xfers : [];
+        const totalBoxes = xferItems.reduce((sum, item) => sum + (parseInt(item.totalBoxes, 10) || 0), 0);
+        const communication = getLatestOrderCommunication(order.id);
+
+        const itemRows = xferItems.map(item => {
+          const xferNumber = item.xferNumber || item.xferNo || item.name || 'Unknown XFER';
+          const boxes = parseInt(item.totalBoxes, 10) || 0;
+          return `
+            <div class="flex items-center justify-between py-3 border-b border-slate-200 last:border-b-0">
+              <div class="text-sm font-semibold text-slate-900">${xferNumber}</div>
+              <div class="text-sm font-semibold text-slate-700">${boxes} Boxes</div>
+            </div>
+          `;
+        }).join('');
+
+        const statusBadge = order.status === 'COMPLETED'
+          ? `<div class="rounded-full bg-emerald-100 px-4 py-2 text-emerald-700 text-xs font-bold uppercase tracking-[0.25em]">COMPLETED</div>`
+          : order.status === 'VERIFIED_BY_DRIVER'
+          ? `<div class="rounded-full bg-slate-950 px-4 py-2 text-white text-xs font-bold uppercase tracking-[0.25em]">VERIFIED BY DRIVER</div>`
+          : `<div class="rounded-full bg-slate-100 px-4 py-2 text-slate-700 text-xs font-bold uppercase tracking-[0.25em]">${order.status || 'PENDING'}</div>`;
+
+        const remarkSection = communication?.remark ? `
+          <div class="mt-6 rounded-[1.75rem] border border-orange-200 bg-orange-50 p-4">
+            <div class="text-[10px] uppercase tracking-[0.35em] text-orange-700 font-bold mb-2">Outlet Remarks</div>
+            <p class="text-sm text-slate-900 font-semibold">${communication.remark}</p>
+            <div class="mt-3 flex flex-wrap gap-2 text-[11px] font-medium text-orange-700">
+              ${communication.xfer ? `<span>${communication.xfer}</span>` : ''}
+              <span>${formatTimeLabel(communication.time)}</span>
+            </div>
+          </div>
+        ` : '';
+
+        const replySection = communication?.response ? `
+          <div class="mt-4 rounded-[1.75rem] border border-slate-300 bg-slate-50 p-4">
+            <div class="text-[10px] uppercase tracking-[0.35em] text-slate-700 font-bold mb-2">Admin Reply</div>
+            <p class="text-sm text-slate-900 font-semibold">${communication.response}</p>
+            <div class="mt-3 flex flex-wrap gap-2 text-[11px] font-medium text-slate-500">
+              <span>By ${communication.responseBy || 'Admin'}</span>
+              <span>${formatTimeLabel(communication.responseTime)}</span>
+            </div>
+          </div>
+        ` : '';
+
+        const card = document.createElement('div');
+        card.className = 'bg-white rounded-[2rem] border border-slate-200 p-5 card-shadow';
+        card.innerHTML = `
+          <div class="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+            <div class="space-y-4">
+              <div>
+                <div class="text-[10px] uppercase tracking-[0.35em] font-bold text-slate-400">Transfer ID</div>
+                <div class="text-2xl font-extrabold text-slate-950">${transferId}</div>
+              </div>
+              <div>
+                <div class="text-[10px] uppercase tracking-[0.35em] font-bold text-slate-400">Outlet Name</div>
+                <div class="mt-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700">${outletName}</div>
+              </div>
+            </div>
+            <div class="flex flex-col items-start gap-3 sm:items-end">
+              ${statusBadge}
+              <button onclick="openOrder('${transferId}')" class="inline-flex items-center justify-center gap-2 rounded-3xl bg-slate-950 px-5 py-4 text-sm font-bold text-white hover:bg-slate-800 transition shadow-lg">
+                <i data-lucide="external-link" class="w-4 h-4"></i>
+                Open / Verify
+              </button>
+            </div>
+          </div>
+          <div class="mt-6 rounded-[2rem] border border-slate-200 bg-slate-50 p-5">
+            <div class="text-[10px] uppercase tracking-[0.35em] font-bold text-slate-400 mb-4">CHECK PHYSICAL ITEMS</div>
+            ${itemRows || '<div class="text-sm text-slate-500">No XFER items available.</div>'}
+            <div class="mt-4 rounded-3xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 flex items-center justify-between">
+              <span>Total Boxes</span>
+              <span>${totalBoxes} Boxes</span>
+            </div>
+          </div>
+          ${remarkSection}
+          ${replySection}
+        `;
+
+        container.appendChild(card);
+      });
+      lucide.createIcons();
+    }
+
+    function getOutletHistory(outletId) {
+      if (!outletId) return [];
+      let data = [];
+      try {
+        const manager = window.SDRSStateManager;
+        data = manager ? manager.getState('outletHistory') : JSON.parse(localStorage.getItem('outletHistory') || '[]');
+        if (!Array.isArray(data)) data = [];
+      } catch {
+        data = [];
+      }
+      
+      const filtered = data.filter(record => String(record.outletId || '').trim() === String(outletId || '').trim());
+      
+      if (filtered.length === 0) {
+        try {
+          const legacyData = JSON.parse(localStorage.getItem('sdrs_outlet_history') || '{}');
+          if (legacyData[outletId] && legacyData[outletId].history) {
+            legacyData[outletId].history.forEach(item => {
+              item.outletId = outletId;
+              item.outletName = legacyData[outletId].outletName;
+            });
+            return legacyData[outletId].history;
+          }
+        } catch (e) {
+          // ignore legacy data errors
+        }
+      }
+      
+      return filtered;
+    }
+
+    function getOrderComplaints(orderId) {
+      const manager = window.SDRSStateManager;
+      const complaints = (manager ? manager.getState('complaints') : (JSON.parse(localStorage.getItem('sdrs_complaints') || '[]') || []))
+        .filter(c => String(c.orderId) === String(orderId))
+        .sort((a, b) => (b.time || 0) - (a.time || 0));
+      const latestByXfer = {};
+      complaints.forEach(c => {
+        const xferKey = String(c.xfer || c.transferId || c.orderId || '').trim();
+        if (!xferKey) return;
+        if (!latestByXfer[xferKey]) {
+          latestByXfer[xferKey] = c;
+        }
+      });
+      return Object.values(latestByXfer);
+    }
+
+    function renderHistory(outletId) {
+      const historyContainer = document.getElementById('historyContainer');
+      const historyCount = document.getElementById('historyCount');
+      const historyEmptyState = document.getElementById('historyEmptyState');
+      let historyRecords = getOutletHistory(outletId)
+        .slice()
+        .sort((a, b) => new Date(b.completedAt || 0) - new Date(a.completedAt || 0));
+      const seenOrders = new Set();
+      historyRecords = historyRecords.filter(record => {
+        const recordId = String(record.orderId || record.id || '').trim();
+        if (!recordId || seenOrders.has(recordId)) return false;
+        seenOrders.add(recordId);
+        return true;
+      });
+
+      historyContainer.innerHTML = '';
+      historyCount.textContent = `${historyRecords.length} Records`;
+      if (!historyRecords.length) {
+        historyEmptyState.classList.remove('hidden');
+        return;
+      }
+
+      historyEmptyState.classList.add('hidden');
+      historyRecords.forEach(record => {
+        const recordDate = record.completedAt ? formatTimeLabel(record.completedAt) : '--';
+        const complaintItems = getOrderComplaints(record.orderId);
+        const issueBadge = record.hasIssue || complaintItems.length > 0
+          ? '<span class="rounded-full bg-rose-100 px-3 py-1 text-rose-700 text-[10px] font-bold uppercase tracking-[0.25em]">Issue</span>'
+          : '<span class="rounded-full bg-emerald-100 px-3 py-1 text-emerald-700 text-[10px] font-bold uppercase tracking-[0.25em]">OK</span>';
+        const xferList = (record.xferNumbers || []).map(xfer => `<span class="inline-flex rounded-full bg-slate-100 px-3 py-1 text-slate-600 text-xs font-semibold">${xfer}</span>`).join(' ');
+        const complaintHtml = complaintItems.length > 0 ? complaintItems.map(complaint => `
+          <div class="mt-3 rounded-2xl border border-orange-200 bg-orange-50 p-3">
+            <div class="text-[10px] uppercase tracking-[0.35em] font-bold text-orange-700 mb-1">Complaint</div>
+            <div class="text-sm text-slate-900 font-semibold">${complaint.remark}</div>
+            ${complaint.response ? `
+              <div class="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                <div class="text-[10px] uppercase tracking-[0.35em] font-bold text-slate-700 mb-1">Admin Reply</div>
+                <div class="text-sm text-slate-900 font-semibold">${complaint.response}</div>
+                <div class="mt-2 text-[11px] text-slate-500">By ${complaint.responseBy || 'Admin'} • ${formatTimeLabel(complaint.responseTime || complaint.time)}</div>
+              </div>
+            ` : ''}
+          </div>
+        `).join('') : '<div class="mt-3 text-sm text-slate-500">No complaint recorded for this delivery.</div>';
+
+        const card = document.createElement('div');
+        card.className = 'rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm';
+        card.innerHTML = `
+          <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div class="text-[10px] uppercase tracking-[0.35em] text-slate-500 font-bold">Transfer ID</div>
+              <div class="text-lg font-extrabold text-slate-950 mt-1">${record.orderId}</div>
+              <div class="text-[11px] text-slate-500 mt-2">Completed ${recordDate}</div>
+            </div>
+            <div class="flex items-center gap-2">
+              ${issueBadge}
+            </div>
+          </div>
+          <div class="mt-5 flex flex-wrap gap-2">${xferList}</div>
+          <div class="mt-4 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
+            <div class="text-[10px] uppercase tracking-[0.35em] text-slate-500 font-bold mb-2">Delivered Items</div>
+            <div class="grid gap-2 md:grid-cols-2">
+              ${(record.receivedItems || []).map(item => `
+                <div class="rounded-2xl bg-white border border-slate-200 px-4 py-3 text-sm text-slate-700">
+                  <div class="font-semibold">${item.name || item.xfer || 'Item'}</div>
+                  <div class="mt-1 text-slate-500">Received: ${item.receivedQty || item.expectedQty || 0}</div>
+                  ${item.status ? `<div class="mt-1 text-[11px] text-slate-500 uppercase tracking-[0.25em]">${item.status}</div>` : ''}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          ${complaintHtml}
+        `;
+        historyContainer.appendChild(card);
+      });
+    }
+
+    function openOrder(orderId) {
+      if (!orderId) return;
+      window.location.href = `order-detail.html?id=${encodeURIComponent(orderId)}`;
+    }
+
+    window.addEventListener('sdrs_sync', renderOrders);
+    window.addEventListener('local_state_updated', renderOrders);
+    document.addEventListener('DOMContentLoaded', renderOrders);
+  </script>
+</body>
+</html>

@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en" class="h-full antialiased">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SDRS - Select Outlet</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .card-shadow { box-shadow: 0 4px 20px rgba(15, 35, 65, 0.08); }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-up { animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  </style>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: '#0F2341',
+            teal: '#2BA5B5',
+            'teal-light': '#E8F6F8',
+            corporate: {
+              50: '#f8fafc',
+              100: '#f1f5f9',
+              800: '#1e293b',
+              900: '#0f172a'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <script src="../shared/state.js"></script>
+</head>
+<body class="bg-corporate-50 min-h-screen flex flex-col text-slate-800 pb-10">
+
+  <!-- Setup Header -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+    <div class="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <a href="../index.html" class="text-slate-400 hover:text-navy transition-colors">
+            <i data-lucide="arrow-left" style="width:20px;height:20px;"></i>
+        </a>
+        <div class="w-8 h-8 bg-purple-500 text-white rounded-lg flex items-center justify-center shadow-sm">
+          <i data-lucide="store" style="width:18px;height:18px;"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-extrabold text-navy tracking-tight leading-none">Select Outlet</h1>
+          <p class="text-[10px] uppercase font-bold text-purple-500 tracking-widest leading-none mt-1">End Fulfillment</p>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-3xl w-full mx-auto p-4 flex flex-col fade-up">
+    <div class="mb-6 flex space-between w-full">
+        <h2 class="text-navy font-bold flex items-center gap-2">
+            <i data-lucide="map-pin" class="text-purple-500" style="width:18px;height:18px;"></i> Choose Outlet Location
+        </h2>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" id="outletContainer">
+      <!-- Injected via JS -->
+    </div>
+  </main>
+
+  <script>
+    lucide.createIcons();
+
+    const outlets = [
+        { id: "IDOUT01", name: "Farmasi Al Qanaah Air Biru" },
+        { id: "IDOUT02", name: "Farmasi Al Qanaah Scientex" },
+        { id: "IDOUT03", name: "Farmasi Al Qanaah Kempas" },
+        { id: "IDOUT04", name: "Farmasi Al Qanaah Taman Suria" },
+        { id: "IDOUT05", name: "Farmasi Al Qanaah Sri Saujana" },
+        { id: "IDOUT06", name: "Farmasi Al Qanaah Seri Alam" },
+        { id: "IDOUT07", name: "Farmasi Al Qanaah Pulai Mutiara" },
+        { id: "IDOUT08", name: "Farmasi Al Qanaah Sierra Perdana" }
+    ];
+
+    const container = document.getElementById('outletContainer');
+
+    // Add animation delay to each card
+    outlets.forEach((outlet, index) => {
+        const card = document.createElement('button');
+        card.className = "bg-white border border-slate-200 rounded-2xl overflow-hidden card-shadow p-5 text-left hover:border-purple-300 hover:ring-2 hover:ring-purple-100 transition-all flex flex-col gap-2 group fade-up";
+        card.style.animationDelay = `${index * 50}ms`;
+        
+        card.innerHTML = `
+            <div class="flex items-center justify-between w-full">
+                <div class="text-xs font-bold text-slate-400 tracking-wider">OUTLET ID</div>
+                <div class="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
+                    <i data-lucide="arrow-right" class="text-slate-400 group-hover:text-purple-600 transition-colors" style="width:16px;height:16px;"></i>
+                </div>
+            </div>
+            <div class="text-xl font-extrabold text-navy leading-none mb-1">${outlet.id}</div>
+            <div class="text-sm font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded w-fit border border-purple-100">${outlet.name}</div>
+        `;
+
+        card.onclick = () => {
+            const orderId = localStorage.getItem("temp_last_order_id");
+            if (orderId && window.sdrsOrders) {
+                const order = window.sdrsOrders.find(o => o.id === orderId);
+                if (order) {
+                    order.outletId = outlet.id;
+                    order.outlet = outlet.name;
+                    if(typeof persistState === 'function') persistState();
+                }
+                localStorage.removeItem("temp_last_order_id");
+            }
+            window.location.href = `index.html?outletId=${outlet.id}`;
+        };
+        
+        container.appendChild(card);
+    });
+    
+    lucide.createIcons();
+  </script>
+</body>
+</html>

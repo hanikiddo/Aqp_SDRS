@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Farmasi Al Qanaah SDRS - Admin Login</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .card-shadow { box-shadow: 0 8px 32px rgba(15, 35, 65, 0.12); }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-up { animation: fadeUp 0.6s ease-out both; }
+    .btn-loading { pointer-events: none; opacity: 0.8; }
+    .btn-loading .icon-default { display: none; }
+    .btn-loading .icon-spinner { display: inline-block; animation: spin 1s linear infinite; }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+    .icon-spinner { display: none; }
+  </style>
+  <script src="services/app.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: '#0F2341',
+            teal: '#2BA5B5',
+            'teal-light': '#E8F6F8',
+          }
+        }
+      }
+    }
+    if (window.SDRS?.Auth?.isAuthenticated()) {
+      const session = window.SDRS.Auth.getSession();
+      const redirectMap = {
+        admin: 'admin/index.html',
+        warehouse: 'warehouse/index.html',
+        driver: 'driver/index.html',
+        outlet: 'outlet/index.html'
+      };
+      window.location.href = redirectMap[session?.role] || 'admin/index.html';
+    }
+  </script>
+ </head>
+ <body class="bg-slate-50 min-h-screen flex items-center justify-center p-4">
+  
+  <div class="max-w-md w-full bg-white rounded-3xl p-8 card-shadow fade-up relative overflow-hidden">
+    <!-- Top decoration -->
+    <div class="h-2 w-full bg-teal absolute top-0 left-0"></div>
+
+    <div class="text-center mb-8 mt-2">
+      <div class="w-16 h-16 bg-navy text-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-md">
+        <i data-lucide="package" style="width:32px;height:32px;"></i>
+      </div>
+      <h1 class="text-2xl font-extrabold text-navy tracking-tight leading-none mb-2">Farmasi Al Qanaah SDRS</h1>
+      <p class="text-sm font-semibold text-slate-500">Secure Admin Login</p>
+    </div>
+
+    <form id="loginForm" class="space-y-5" onsubmit="handleLogin(event)">
+      <div>
+        <label for="username" class="text-xs font-bold text-navy/70 uppercase tracking-wide block mb-1.5">Username</label>
+        <div class="relative">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+            <i data-lucide="user" style="width:18px;height:18px;"></i>
+          </div>
+          <input type="text" id="username" required class="w-full pl-10 pr-3 py-3 rounded-xl border-2 border-slate-200 text-sm focus:outline-none focus:border-teal focus:ring-4 focus:ring-teal/10 transition-all text-navy font-semibold placeholder:text-slate-400 placeholder:font-normal" placeholder="Enter your username">
+        </div>
+      </div>
+
+      <div>
+        <label for="password" class="text-xs font-bold text-navy/70 uppercase tracking-wide block mb-1.5">Password</label>
+        <div class="relative">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+            <i data-lucide="lock" style="width:18px;height:18px;"></i>
+          </div>
+          <input type="password" id="password" required class="w-full pl-10 pr-10 py-3 rounded-xl border-2 border-slate-200 text-sm focus:outline-none focus:border-teal focus:ring-4 focus:ring-teal/10 transition-all text-navy font-semibold placeholder:text-slate-400 placeholder:font-normal" placeholder="Enter your password">
+          <button type="button" onclick="togglePassword()" class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-teal focus:outline-none">
+            <i data-lucide="eye" id="eyeIcon" style="width:18px;height:18px;"></i>
+          </button>
+        </div>
+      </div>
+
+      <div id="errorMsg" class="hidden bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all">
+        <i data-lucide="alert-circle" style="width:16px;height:16px;flex-shrink:0;"></i>
+        <span>Username atau password tidak sah.</span>
+      </div>
+
+      <button type="submit" id="submitBtn" class="w-full mt-2 bg-navy hover:bg-navy/90 text-white font-bold py-3.5 rounded-xl transition-all shadow-md group border border-navy flex items-center justify-center gap-2">
+        <i data-lucide="log-in" class="icon-default group-hover:translate-x-1 transition-transform" style="width:18px;height:18px;"></i>
+        <i data-lucide="loader-2" class="icon-spinner" style="width:18px;height:18px;"></i>
+        <span class="btn-text">Sign In Securely</span>
+      </button>
+
+      <div class="text-center pt-2">
+        <a href="index.html" class="text-xs font-bold text-slate-500 hover:text-teal transition-colors flex items-center justify-center gap-1">
+          <i data-lucide="arrow-left" style="width:14px;height:14px;"></i> Back to Main Menu
+        </a>
+      </div>
+    </form>
+    
+    <div class="mt-8 pt-6 border-t border-slate-100 text-center">
+      <p class="text-xs text-slate-400 font-medium">&copy; 2026 Farmasi Al Qanaah SDRS. Authorized Access Only.</p>
+    </div>
+  </div>
+
+  <script>
+    lucide.createIcons();
+
+    function togglePassword() {
+      const passwordInput = document.getElementById('password');
+      const eyeIcon = document.getElementById('eyeIcon');
+      
+      if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        eyeIcon.setAttribute('data-lucide', 'eye-off');
+      } else {
+        passwordInput.type = 'password';
+        eyeIcon.setAttribute('data-lucide', 'eye');
+      }
+      lucide.createIcons();
+    }
+
+    function handleLogin(e) {
+      e.preventDefault();
+      
+      const userVal = document.getElementById('username').value.trim();
+      const passVal = document.getElementById('password').value.trim();
+      const btn = document.getElementById('submitBtn');
+      const err = document.getElementById('errorMsg');
+      
+      err.classList.add('hidden');
+      btn.classList.add('btn-loading');
+      btn.querySelector('.btn-text').textContent = "Authenticating...";
+
+      setTimeout(() => {
+        const session = window.SDRS?.Auth?.login(userVal, passVal);
+        if (session) {
+          const redirectMap = {
+            admin: 'admin/index.html',
+            warehouse: 'warehouse/index.html',
+            driver: 'driver/index.html',
+            outlet: 'outlet/index.html'
+          };
+          window.location.href = redirectMap[session.role] || 'admin/index.html';
+          return;
+        }
+
+        btn.classList.remove('btn-loading');
+        btn.querySelector('.btn-text').textContent = "Sign In Securely";
+        err.classList.remove('hidden');
+        const form = document.getElementById('loginForm');
+        form.style.transform = 'translateX(-5px)';
+        setTimeout(() => form.style.transform = 'translateX(5px)', 100);
+        setTimeout(() => form.style.transform = 'translateX(-5px)', 200);
+        setTimeout(() => form.style.transform = 'translateX(0)', 300);
+        document.getElementById('password').value = '';
+        document.getElementById('password').focus();
+      }, 600);
+    }
+  </script>
+ </body>
+</html>

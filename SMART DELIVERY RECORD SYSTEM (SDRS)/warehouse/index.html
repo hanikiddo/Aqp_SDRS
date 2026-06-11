@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="en" class="h-full antialiased">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SDRS - Warehouse Module</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .card-shadow { box-shadow: 0 4px 20px rgba(15, 35, 65, 0.08); }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-up { animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  </style>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: '#0F2341',
+            teal: '#2BA5B5',
+            'teal-light': '#E8F6F8',
+            corporate: {
+              50: '#f8fafc',
+              100: '#f1f5f9',
+              800: '#1e293b',
+              900: '#0f172a'
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-corporate-50 min-h-screen flex flex-col text-slate-800 pb-10">
+
+  <!-- Setup Header -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+    <div class="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <a href="../index.html" class="text-slate-400 hover:text-navy transition-colors">
+            <i data-lucide="arrow-left" style="width:20px;height:20px;"></i>
+        </a>
+        <div class="w-8 h-8 bg-amber-500 text-white rounded-lg flex items-center justify-center shadow-sm">
+          <i data-lucide="factory" style="width:18px;height:18px;"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-extrabold text-navy tracking-tight leading-none">Warehouse</h1>
+          <p class="text-[10px] uppercase font-bold text-amber-500 tracking-widest leading-none mt-1">Order Generation</p>
+        </div>
+      </div>
+      
+      <!-- Notification Area -->
+      <div id="complaintNotification" class="hidden items-center gap-2 bg-red-50 text-red-600 px-3 py-1.5 rounded-lg border border-red-200 cursor-pointer hover:bg-red-100 transition-colors" onclick="readComplaints()">
+          <div class="relative flex items-center">
+              <i data-lucide="bell" class="animate-bounce" style="width:18px;height:18px;"></i>
+              <span class="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+              </span>
+          </div>
+          <span class="text-xs font-bold whitespace-nowrap">Complaint: <span id="complaintCount">0</span></span>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-3xl w-full mx-auto p-4 flex flex-col fade-up">
+    
+    <section id="outlet-selection-section">
+      <div id="outletGrid" class="bg-white border border-slate-200 rounded-2xl overflow-hidden card-shadow mb-6">
+        <div class="bg-slate-50 border-b border-slate-200 p-4 flex items-center gap-2">
+          <i data-lucide="map-pin" class="text-amber-500" style="width:20px;height:20px;"></i>
+          <h2 class="font-extrabold text-navy text-lg">Select Outlet</h2>
+        </div>
+      <div class="p-6 grid gap-4 sm:grid-cols-2">
+        <button type="button" onclick="selectOutlet('IDOUT01','Farmasi Al Qanaah Air Biru')" class="text-left border border-amber-200 rounded-2xl bg-white p-4 hover:border-amber-500 hover:bg-amber-50 transition-all">
+          <div class="text-xs font-bold text-amber-600 uppercase tracking-wide mb-1">Outlet ID</div>
+          <div class="text-lg font-extrabold text-navy">IDOUT01</div>
+          <div class="text-sm text-slate-600 mt-2">Farmasi Al Qanaah Air Biru</div>
+        </button>
+        <button type="button" onclick="selectOutlet('IDOUT02','Farmasi Al Qanaah Scientex')" class="text-left border border-amber-200 rounded-2xl bg-white p-4 hover:border-amber-500 hover:bg-amber-50 transition-all">
+          <div class="text-xs font-bold text-amber-600 uppercase tracking-wide mb-1">Outlet ID</div>
+          <div class="text-lg font-extrabold text-navy">IDOUT02</div>
+          <div class="text-sm text-slate-600 mt-2">Farmasi Al Qanaah Scientex</div>
+        </button>
+        <button type="button" onclick="selectOutlet('IDOUT03','Farmasi Al Qanaah Kempas')" class="text-left border border-amber-200 rounded-2xl bg-white p-4 hover:border-amber-500 hover:bg-amber-50 transition-all">
+          <div class="text-xs font-bold text-amber-600 uppercase tracking-wide mb-1">Outlet ID</div>
+          <div class="text-lg font-extrabold text-navy">IDOUT03</div>
+          <div class="text-sm text-slate-600 mt-2">Farmasi Al Qanaah Kempas</div>
+        </button>
+        <button type="button" onclick="selectOutlet('IDOUT04','Farmasi Al Qanaah Taman Suria')" class="text-left border border-amber-200 rounded-2xl bg-white p-4 hover:border-amber-500 hover:bg-amber-50 transition-all">
+          <div class="text-xs font-bold text-amber-600 uppercase tracking-wide mb-1">Outlet ID</div>
+          <div class="text-lg font-extrabold text-navy">IDOUT04</div>
+          <div class="text-sm text-slate-600 mt-2">Farmasi Al Qanaah Taman Suria</div>
+        </button>
+        <button type="button" onclick="selectOutlet('IDOUT05','Farmasi Al Qanaah Sri Saujana')" class="text-left border border-amber-200 rounded-2xl bg-white p-4 hover:border-amber-500 hover:bg-amber-50 transition-all">
+          <div class="text-xs font-bold text-amber-600 uppercase tracking-wide mb-1">Outlet ID</div>
+          <div class="text-lg font-extrabold text-navy">IDOUT05</div>
+          <div class="text-sm text-slate-600 mt-2">Farmasi Al Qanaah Sri Saujana</div>
+        </button>
+        <button type="button" onclick="selectOutlet('IDOUT06','Farmasi Al Qanaah Seri Alam')" class="text-left border border-amber-200 rounded-2xl bg-white p-4 hover:border-amber-500 hover:bg-amber-50 transition-all">
+          <div class="text-xs font-bold text-amber-600 uppercase tracking-wide mb-1">Outlet ID</div>
+          <div class="text-lg font-extrabold text-navy">IDOUT06</div>
+          <div class="text-sm text-slate-600 mt-2">Farmasi Al Qanaah Seri Alam</div>
+        </button>
+        <button type="button" onclick="selectOutlet('IDOUT07','Farmasi Al Qanaah Pulai Mutiara')" class="text-left border border-amber-200 rounded-2xl bg-white p-4 hover:border-amber-500 hover:bg-amber-50 transition-all">
+          <div class="text-xs font-bold text-amber-600 uppercase tracking-wide mb-1">Outlet ID</div>
+          <div class="text-lg font-extrabold text-navy">IDOUT07</div>
+          <div class="text-sm text-slate-600 mt-2">Farmasi Al Qanaah Pulai Mutiara</div>
+        </button>
+        <button type="button" onclick="selectOutlet('IDOUT08','Farmasi Al Qanaah Sierra Perdana')" class="text-left border border-amber-200 rounded-2xl bg-white p-4 hover:border-amber-500 hover:bg-amber-50 transition-all">
+          <div class="text-xs font-bold text-amber-600 uppercase tracking-wide mb-1">Outlet ID</div>
+          <div class="text-lg font-extrabold text-navy">IDOUT08</div>
+          <div class="text-sm text-slate-600 mt-2">Farmasi Al Qanaah Sierra Perdana</div>
+        </button>
+      </div>
+    </div>
+
+    </section>
+
+    <section id="order-generation-section" class="hidden">
+      <div id="formWrapper" class="bg-white border border-slate-200 rounded-2xl overflow-hidden card-shadow mb-6">
+        <div class="bg-slate-50 border-b border-slate-200 p-4 flex items-center gap-2">
+        <i data-lucide="clipboard-list" class="text-navy" style="width:20px;height:20px;"></i>
+        <div>
+          <h2 class="font-extrabold text-navy text-lg">Create Transfer Order (XFER)</h2>
+          <p id="outletSubtitle" class="text-xs uppercase tracking-wide font-bold text-amber-500 mt-1"></p>
+        </div>
+      </div>
+      
+      <div class="p-6">
+        <form id="xferForm" onsubmit="generateOrder(event)" class="space-y-5">
+            <div class="bg-amber-50 p-4 rounded-xl border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+                <div>
+                    <div class="text-xs font-bold text-amber-600/80 tracking-wider mb-1 uppercase">SELECTED OUTLET</div>
+                    <div id="xferPreview" class="text-xl font-extrabold text-navy">Pilih Outlet...</div>
+                    <div id="selected-outlet-display" class="text-sm text-slate-500 mt-2">Please select an outlet above.</div>
+                </div>
+                <div class="sm:text-right">
+                    <div class="text-xs font-bold text-amber-600/80 tracking-wider mb-1 uppercase">Date Created</div>
+                    <div id="datePreview" class="text-sm font-bold text-slate-700">Auto-generated on Submit</div>
+                </div>
+            </div>
+
+            <div id="xferListSection">
+              <div class="flex items-center justify-between mb-3">
+                <div>
+                  <label class="block text-sm font-bold text-navy uppercase tracking-wide">XFER Entries</label>
+                  <p class="text-xs text-slate-500">Add one or more transfer orders for this outlet.</p>
+                </div>
+                <button type="button" onclick="addXferRow()" class="text-xs bg-amber-50 text-amber-600 font-bold px-3 py-2 rounded-xl hover:bg-amber-100 transition-colors flex items-center gap-2">
+                  <i data-lucide="plus" style="width:14px;height:14px;"></i> Add XFER
+                </button>
+              </div>
+
+              <div id="xfer-list" class="space-y-4"></div>
+              <div class="mt-4 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <span class="text-sm font-bold text-slate-700">Grand Total Boxes</span>
+                <span id="total-boxes" class="text-xl font-extrabold text-navy">0</span>
+              </div>
+            </div>
+
+            <div class="pt-4 border-t border-slate-100">
+              <button type="submit" id="submitBtn" class="w-full bg-navy hover:bg-navy/90 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-md flex justify-center items-center gap-2">
+                <i data-lucide="send" style="width:18px;height:18px;"></i>
+                Generate Order
+              </button>
+            </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Success Message -->
+    <div id="successMsg" class="hidden bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl p-4 flex items-start gap-3 shadow-sm fade-up">
+        <i data-lucide="check-circle-2" class="text-emerald-500 shrink-0" style="width:24px;height:24px;"></i>
+        <div>
+            <h3 class="font-bold text-emerald-800 mb-1">Order Created Successfully</h3>
+            <p class="text-sm text-emerald-600 font-medium">The transfer order (<span id="successCode" class="font-mono font-bold"></span>) has been generated and dispatched to the driver queue.</p>
+        </div>
+    </div>
+
+  </main>
+
+  <script src="../shared/state.js"></script>
+  <script>
+    lucide.createIcons();
+
+    const SDRS_ORDER_VERSION_KEY = 'sdrs_main_orders_version';
+    const SDRS_ORDER_VERSION = '2';
+
+    function ensureOrderStorageVersion() {
+      const currentVersion = localStorage.getItem(SDRS_ORDER_VERSION_KEY);
+      if (currentVersion !== SDRS_ORDER_VERSION) {
+        localStorage.removeItem('sdrs_main_orders');
+        if (window.sdrsState) {
+          window.sdrsState.warehouse_xfer_data = [];
+        }
+        window.sdrsOrders = [];
+        localStorage.setItem(SDRS_ORDER_VERSION_KEY, SDRS_ORDER_VERSION);
+      }
+    }
+
+    ensureOrderStorageVersion();
+
+    let selectedOutletId = '';
+    let selectedOutletName = '';
+
+    function selectOutlet(id, name) {
+      selectedOutletId = id;
+      selectedOutletName = name;
+      document.getElementById('xferPreview').textContent = `${id} - ${name}`;
+      document.getElementById('selected-outlet-display').textContent = name;
+      document.getElementById('outletSubtitle').textContent = name;
+      document.getElementById('outlet-selection-section').classList.add('hidden');
+      document.getElementById('order-generation-section').classList.remove('hidden');
+      clearXferList();
+      updateGrandTotal();
+    }
+
+    function addXferRow(data = {}) {
+      const container = document.getElementById('xfer-list');
+      const row = document.createElement('div');
+      row.className = 'xfer-row bg-slate-50 rounded-xl border border-slate-200 p-4 flex flex-col gap-3 shadow-sm sm:flex-row sm:items-end';
+      row.innerHTML = `
+        <div class="grid gap-3 sm:grid-cols-3 sm:flex-1">
+          <label class="block">
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wide">XFER Number</span>
+            <input type="text" name="xferNumber" value="${data.xferNumber || ''}" required class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500 transition" placeholder="Enter XFER number">
+          </label>
+          <label class="block">
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wide">Total Boxes</span>
+            <input type="number" name="totalBoxes" min="1" value="${data.totalBoxes || 1}" required class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500 transition">
+          </label>
+          <label class="block sm:col-span-3">
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wide">Remarks</span>
+            <input type="text" name="remarks" value="${data.remarks || ''}" class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500 transition" placeholder="Optional remarks">
+          </label>
+        </div>
+        <div class="self-start inline-flex items-center gap-2">
+          <button type="button" onclick="toggleXferSuccess(this)" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:border-amber-500 hover:bg-amber-50 transition">
+            <i data-lucide="check" style="width:16px;height:16px;"></i>
+            Done
+          </button>
+          <button type="button" onclick="removeXferRow(this)" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:border-amber-500 hover:bg-amber-50 transition">
+            <i data-lucide="trash-2" style="width:16px;height:16px;"></i>
+            Remove
+          </button>
+        </div>
+      `;
+      const totalInput = row.querySelector('input[name="totalBoxes"]');
+      if (totalInput) {
+        totalInput.addEventListener('input', calculateDoneBoxTotal);
+      }
+      container.appendChild(row);
+      lucide.createIcons();
+      calculateDoneBoxTotal();
+    }
+
+    function toggleXferSuccess(button) {
+      const row = button.closest('.xfer-row');
+      const isActive = row.classList.toggle('border-green-500');
+      row.classList.toggle('bg-green-50', isActive);
+      row.classList.toggle('border-slate-200', !isActive);
+      button.classList.toggle('bg-green-50', isActive);
+      button.classList.toggle('border-emerald-500', isActive);
+      button.classList.toggle('text-emerald-800', isActive);
+      button.classList.toggle('text-slate-700', !isActive);
+      button.classList.toggle('hover:border-amber-500', !isActive);
+      button.classList.toggle('hover:bg-amber-50', !isActive);
+      button.innerHTML = '<i data-lucide="check" style="width:16px;height:16px;"></i>Done';
+      lucide.createIcons();
+      calculateDoneBoxTotal();
+    }
+
+    function removeXferRow(button) {
+      const list = document.getElementById('xfer-list');
+      if (list.children.length === 1) {
+        showError('Sila kekalkan sekurang-kurangnya satu baris XFER.');
+        return;
+      }
+      button.closest('.xfer-row').remove();
+      calculateDoneBoxTotal();
+    }
+
+    function calculateDoneBoxTotal() {
+      const totalBoxes = Array.from(document.querySelectorAll('#xfer-list .xfer-row.border-green-500 input[name="totalBoxes"]'))
+        .reduce((sum, input) => sum + (parseInt(input.value, 10) || 0), 0);
+      document.getElementById('total-boxes').textContent = totalBoxes;
+    }
+
+    function updateGrandTotal() {
+      calculateDoneBoxTotal();
+    }
+
+    function clearXferList() {
+      const list = document.getElementById('xfer-list');
+      list.innerHTML = '';
+      addXferRow();
+    }
+
+    function generateOrder(event) {
+      event.preventDefault();
+      if (!selectedOutletId || !selectedOutletName) {
+        showError('Sila pilih outlet terlebih dahulu.');
+        return;
+      }
+
+      const completedRows = Array.from(document.querySelectorAll('#xfer-list .xfer-row.border-green-500'));
+      const xfers = completedRows.map(row => {
+        const xferNumber = row.querySelector('[name="xferNumber"]').value.trim();
+        const totalBoxes = parseInt(row.querySelector('[name="totalBoxes"]').value, 10) || 0;
+        const remarks = row.querySelector('[name="remarks"]').value.trim();
+        return { xferNumber, totalBoxes, remarks };
+      }).filter(item => item.xferNumber && item.totalBoxes > 0);
+
+      if (xfers.length === 0) {
+        showError('Sila tandakan sekurang-kurangnya satu baris XFER selesai dan lengkapkan nombor serta jumlah kotak.');
+        return;
+      }
+
+      const now = new Date();
+      const createdAt = now.toLocaleString('en-MY', {
+        timeZone: 'Asia/Kuala_Lumpur',
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      const transferID = window.SDRSStateManager && typeof window.SDRSStateManager.generateTransferId === 'function'
+        ? window.SDRSStateManager.generateTransferId()
+        : `${selectedOutletId}-${now.getTime()}`;
+
+      const order = {
+        id: transferID,
+        transferId: transferID,
+        outletId: selectedOutletId,
+        outletName: selectedOutletName,
+        xferItems: xfers,
+        totalBoxes: xfers.reduce((sum, item) => sum + (item.totalBoxes || 0), 0),
+        createdAt,
+        createdTimestamp: now.getTime(),
+        status: 'PENDING_DRIVER',
+        driverStatus: 'PENDING_DRIVER',
+        outletStatus: 'PENDING_OUTLET',
+        timestamps: { createdAt: now.getTime() },
+        remarks: [],
+        adminReplies: []
+      };
+
+      if (window.SDRSStateManager) {
+        window.SDRSStateManager.appendState('warehouseTransfers', order);
+        window.SDRSStateManager.appendState('driverQueue', order);
+        window.SDRSStateManager.appendState('adminGlobalPipeline', order);
+        window.SDRSStateManager.syncAllModules();
+      } else {
+        const warehouseOrders = window.sdrsState?.warehouseTransfers || [];
+        warehouseOrders.push(order);
+
+        window.sdrsState.warehouseTransfers = warehouseOrders;
+        window.sdrsState.driverQueue = window.sdrsState.driverQueue || [];
+        window.sdrsState.driverQueue.push(order);
+        window.sdrsState.adminGlobalPipeline = window.sdrsState.adminGlobalPipeline || [];
+        window.sdrsState.adminGlobalPipeline.push(order);
+
+        localStorage.setItem('warehouseTransfers', JSON.stringify(warehouseOrders));
+        localStorage.setItem('driverQueue', JSON.stringify(window.sdrsState.driverQueue || []));
+        localStorage.setItem('adminGlobalPipeline', JSON.stringify(window.sdrsState.adminGlobalPipeline || []));
+      }
+
+      localStorage.setItem('sdrs_last_order', JSON.stringify({
+        id: transferID,
+        transferId: transferID,
+        outletId: selectedOutletId,
+        outletName: selectedOutletName
+      }));
+
+      window.location.href = 'order-done.html';
+    }
+
+    function showOutletGrid() {
+      selectedOutletId = '';
+      selectedOutletName = '';
+      document.getElementById('outlet-selection-section').classList.remove('hidden');
+      document.getElementById('order-generation-section').classList.add('hidden');
+      document.getElementById('xferPreview').textContent = 'Pilih Outlet...';
+      document.getElementById('selected-outlet-display').textContent = 'Please select an outlet above.';
+      document.getElementById('outletSubtitle').textContent = '';
+      clearXferList();
+      updateGrandTotal();
+    }
+
+    function showError(msg) {
+        let toast = document.getElementById('error-toast');
+        if(!toast) {
+            toast = document.createElement('div');
+            toast.id = 'error-toast';
+            toast.className = 'fixed top-6 left-1/2 -translate-x-1/2 z-[100] bg-red-50 border-2 border-red-200 text-red-800 px-5 py-3.5 rounded-2xl shadow-xl flex items-center gap-3 fade-up w-[90%] max-w-sm';
+            toast.innerHTML = `
+                <div class="bg-red-200 w-8 h-8 rounded-full flex items-center justify-center shrink-0">
+                    <i data-lucide="alert-triangle" class="text-red-700" style="width:16px;height:16px;"></i>
+                </div>
+                <p id="error-toast-msg" class="text-sm font-bold leading-tight"></p>
+            `;
+            document.body.appendChild(toast);
+        }
+        document.getElementById('error-toast-msg').textContent = msg;
+        toast.style.display = 'flex';
+        lucide.createIcons();
+
+        if(window.errorToastTimer) clearTimeout(window.errorToastTimer);
+        window.errorToastTimer = setTimeout(() => {
+            toast.style.display = 'none';
+        }, 3500);
+    }
+
+    function showInfo(msg) {
+        let toast = document.getElementById('info-toast');
+        if(!toast) {
+            toast = document.createElement('div');
+            toast.id = 'info-toast';
+            toast.className = 'fixed top-6 left-1/2 -translate-x-1/2 z-[100] bg-slate-50 border-2 border-slate-200 text-slate-900 px-5 py-3.5 rounded-2xl shadow-xl flex items-center gap-3 fade-up w-[90%] max-w-sm';
+            toast.innerHTML = `
+                <div class="bg-slate-200 w-8 h-8 rounded-full flex items-center justify-center shrink-0">
+                    <i data-lucide="info" class="text-slate-700" style="width:16px;height:16px;"></i>
+                </div>
+                <p id="info-toast-msg" class="text-sm font-bold leading-tight"></p>
+            `;
+            document.body.appendChild(toast);
+        }
+        document.getElementById('info-toast-msg').textContent = msg;
+        toast.style.display = 'flex';
+        lucide.createIcons();
+
+        if(window.infoToastTimer) clearTimeout(window.infoToastTimer);
+        window.infoToastTimer = setTimeout(() => {
+            toast.style.display = 'none';
+        }, 2500);
+    }
+
+    function checkComplaints() {
+        const manager = window.SDRSStateManager;
+        const complaints = manager ? manager.getState('complaints') : JSON.parse(localStorage.getItem("sdrs_complaints")) || [];
+        const newComplaints = complaints.filter(c => c.status === "NEW");
+        
+        const notifEl = document.getElementById('complaintNotification');
+        const countEl = document.getElementById('complaintCount');
+        
+        if (newComplaints.length > 0) {
+            const prev = parseInt(countEl.dataset.count || "0", 10);
+            notifEl.classList.remove('hidden');
+            notifEl.classList.add('flex');
+            countEl.textContent = newComplaints.length;
+            countEl.dataset.count = String(newComplaints.length);
+            
+            if (newComplaints.length > prev) {
+                try { new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg").play(); } catch(e){}
+            }
+        } else {
+            notifEl.classList.add('hidden');
+            notifEl.classList.remove('flex');
+            countEl.dataset.count = "0";
+        }
+    }
+
+    function readComplaints() {
+        const manager = window.SDRSStateManager;
+        const complaints = manager ? manager.getState('complaints') : JSON.parse(localStorage.getItem("sdrs_complaints")) || [];
+        let changed = false;
+        complaints.forEach(c => {
+            if (c.status === "NEW") {
+               c.status = "READ";
+               c.readAt = Date.now();
+               changed = true;
+            }
+        });
+        if (changed) {
+            if (manager) {
+                manager.setState('complaints', complaints);
+            } else {
+                localStorage.setItem("sdrs_complaints", JSON.stringify(complaints));
+            }
+            checkComplaints();
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        showOutletGrid();
+        checkComplaints();
+    });
+    
+    window.addEventListener('storage', (e) => {
+        if (e.key === 'sdrs_complaints') {
+            checkComplaints();
+        }
+    });
+
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en" class="h-full antialiased">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Farmasi Al Qanaah</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <script src="services/app.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .card-shadow { box-shadow: 0 4px 20px rgba(15, 35, 65, 0.08); }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-up { animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
+    .delay-1 { animation-delay: 0.1s; }
+    .delay-2 { animation-delay: 0.2s; }
+    .delay-3 { animation-delay: 0.3s; }
+    /* Simulate loading state on click */
+    .btn-loading { pointer-events: none; opacity: 0.8; }
+    .btn-loading .icon-default { display: none; }
+    .btn-loading .icon-spinner { display: inline-block; animation: spin 1s linear infinite; }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+    .icon-spinner { display: none; }
+  </style>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: '#0F2341',
+            teal: '#2BA5B5',
+            'teal-light': '#E8F6F8',
+            corporate: {
+              50: '#f8fafc',
+              100: '#f1f5f9',
+              800: '#1e293b',
+              900: '#0f172a'
+            }
+          }
+        }
+      }
+    }
+  </script>
+ </head>
+ <body class="bg-corporate-50 min-h-screen flex flex-col text-slate-800">
+
+  <!-- Top Header Navigation -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <img src="assets/logo.jpg" alt="Farmasi Al Qanaah Logo" class="w-12 h-12 rounded-full shadow-md object-cover border-2 border-white" />
+        <div>
+          <h1 class="text-xl font-extrabold text-navy tracking-tight leading-none">Farmasi Al Qanaah</h1>
+          <p class="text-[10px] uppercase font-bold text-teal tracking-widest leading-none mt-1">Global Operations</p>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col">
+    
+    <!-- Title & Presentation -->
+    <div class="mb-10 fade-up">
+      <div class="flex items-center justify-between flex-wrap gap-4 mb-2">
+        <h2 class="text-3xl md:text-4xl font-extrabold text-navy tracking-tight">Smart Delivery Record System</h2>
+        <div class="inline-flex items-center gap-2 bg-green-50 text-green-700 px-3 py-1 rounded-md text-sm font-bold border border-green-200 shadow-sm">
+          <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> System Online
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10 fade-up delay-1">
+      <!-- Stat 1 -->
+      <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col">
+        <div class="flex items-center gap-2 mb-2">
+            <i data-lucide="package" class="text-teal" style="width:18px;height:18px;"></i>
+            <span class="text-sm font-semibold text-slate-500">Total Orders</span>
+        </div>
+        <span id="stat-total" class="text-3xl font-extrabold text-navy">-</span>
+      </div>
+      <!-- Stat 2 -->
+      <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col">
+        <div class="flex items-center gap-2 mb-2">
+            <i data-lucide="truck" class="text-indigo-500" style="width:18px;height:18px;"></i>
+            <span class="text-sm font-semibold text-slate-500">Pending Driver</span>
+        </div>
+        <span id="stat-driver-pending" class="text-3xl font-extrabold text-navy">-</span>
+      </div>
+      <!-- Stat 3 -->
+      <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col">
+        <div class="flex items-center gap-2 mb-2">
+            <i data-lucide="store" class="text-orange-500" style="width:18px;height:18px;"></i>
+            <span class="text-sm font-semibold text-slate-500">Pending Outlet</span>
+        </div>
+        <span id="stat-outlet-pending" class="text-3xl font-extrabold text-navy">-</span>
+      </div>
+      <!-- Stat 4 -->
+      <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col">
+        <div class="flex items-center gap-2 mb-2">
+            <i data-lucide="check-circle" class="text-green-500" style="width:18px;height:18px;"></i>
+            <span class="text-sm font-semibold text-slate-500">Completed Full</span>
+        </div>
+        <span id="stat-completed" class="text-3xl font-extrabold text-navy">-</span>
+      </div>
+    </div>
+
+    <!-- Modules Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 fade-up delay-2">
+      
+      <!-- Warehouse Module -->
+      <div class="group flex flex-col bg-white border border-slate-200 rounded-2xl overflow-hidden card-shadow hover:shadow-lg hover:border-amber-500/50 hover:-translate-y-1 transition-all duration-300">
+        <!-- Decoration indicating warehouse styling -->
+        <div class="bg-slate-50 h-32 flex items-center justify-center border-b border-slate-100 relative overflow-hidden group-hover:bg-amber-50 transition-colors">
+            <i data-lucide="factory" class="text-amber-500 relative z-10" style="width:40px;height:40px;"></i>
+        </div>
+        <div class="p-6 flex-1 flex flex-col">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="bg-amber-50 text-amber-600 text-xs font-bold px-2 py-1 rounded">Logistics Root</span>
+            </div>
+            <h2 class="text-lg font-extrabold text-navy mb-2">Warehouse Node</h2>
+            <p class="text-slate-500 text-sm mb-6 flex-1">Create and assign new Transfer Orders (XFER) to logistics staff.</p>
+            <a href="warehouse/index.html" target="_blank" onclick="handleLoad(this)" class="inline-flex items-center justify-center gap-2 bg-white border-2 border-slate-200 hover:border-amber-500 hover:text-amber-700 text-navy font-bold py-2 px-4 rounded-xl transition-colors w-full group/btn text-sm">
+                <i data-lucide="external-link" class="icon-default group-hover/btn:scale-110 transition-transform" style="width:16px;height:16px;"></i>
+                <i data-lucide="loader-2" class="icon-spinner" style="width:16px;height:16px;"></i>
+                <span class="btn-text">Access Module</span>
+            </a>
+        </div>
+      </div>
+
+      <!-- Driver Module -->
+      <div class="group flex flex-col bg-white border border-slate-200 rounded-2xl overflow-hidden card-shadow hover:shadow-lg hover:border-teal/50 hover:-translate-y-1 transition-all duration-300">
+        <!-- Decoration indicating mobile styling -->
+        <div class="bg-slate-50 h-32 flex items-center justify-center border-b border-slate-100 relative overflow-hidden group-hover:bg-teal-light/70 transition-colors">
+            <div class="w-16 h-32 bg-white rounded-t-xl border-t border-l border-r border-slate-300 shadow-sm absolute bottom-0 translate-y-4 flex flex-col justify-between p-1">
+                <div class="w-6 h-1 bg-slate-200 mx-auto rounded-full"></div>
+                <div class="w-full h-20 bg-slate-50 rounded bg-teal-light border border-teal/20"></div>
+            </div>
+            <i data-lucide="smartphone" class="text-teal relative z-10" style="width:40px;height:40px;"></i>
+        </div>
+        <div class="p-6 flex-1 flex flex-col">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="bg-teal-light text-teal text-xs font-bold px-2 py-1 rounded">Field Operations</span>
+            </div>
+            <h2 class="text-lg font-extrabold text-navy mb-2">Driver Console</h2>
+            <p class="text-slate-500 text-sm mb-6 flex-1">Mobile interface for drivers to verify XFER orders in real time.</p>
+            <a href="driver/index.html" target="_blank" onclick="handleLoad(this)" class="inline-flex items-center justify-center gap-2 bg-white border-2 border-slate-200 hover:border-teal hover:text-teal text-navy font-bold py-2 px-4 rounded-xl transition-colors w-full group/btn text-sm">
+                <i data-lucide="external-link" class="icon-default group-hover/btn:scale-110 transition-transform" style="width:16px;height:16px;"></i>
+                <i data-lucide="loader-2" class="icon-spinner" style="width:16px;height:16px;"></i>
+                <span class="btn-text">Access Module</span>
+            </a>
+        </div>
+      </div>
+      
+      <!-- Outlet Module -->
+      <div class="group flex flex-col bg-white border border-slate-200 rounded-2xl overflow-hidden card-shadow hover:shadow-lg hover:border-purple-500/50 hover:-translate-y-1 transition-all duration-300">
+        <!-- Decoration indicating outlet styling -->
+        <div class="bg-slate-50 h-32 flex items-center justify-center border-b border-slate-100 relative overflow-hidden group-hover:bg-purple-50 transition-colors">
+            <i data-lucide="store" class="text-purple-500 relative z-10" style="width:40px;height:40px;"></i>
+        </div>
+        <div class="p-6 flex-1 flex flex-col">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="bg-purple-50 text-purple-600 text-xs font-bold px-2 py-1 rounded">End Fulfillment</span>
+            </div>
+            <h2 class="text-lg font-extrabold text-navy mb-2">Outlet Receiver</h2>
+            <p class="text-slate-500 text-sm mb-6 flex-1">Check and acknowledge inventory deliveries by local branch team.</p>
+            <a href="outlet/select-outlet.html" target="_blank" onclick="handleLoad(this)" class="inline-flex items-center justify-center gap-2 bg-white border-2 border-slate-200 hover:border-purple-500 hover:text-purple-700 text-navy font-bold py-2 px-4 rounded-xl transition-colors w-full group/btn text-sm">
+                <i data-lucide="external-link" class="icon-default group-hover/btn:scale-110 transition-transform" style="width:16px;height:16px;"></i>
+                <i data-lucide="loader-2" class="icon-spinner" style="width:16px;height:16px;"></i>
+                <span class="btn-text">Access Module</span>
+            </a>
+        </div>
+      </div>
+
+      <!-- Admin Module -->
+      <div class="group flex flex-col bg-white border border-slate-200 rounded-2xl overflow-hidden card-shadow hover:shadow-lg hover:border-navy/40 hover:-translate-y-1 transition-all duration-300">
+        <!-- Decoration indicating desktop dashboard styling -->
+        <div class="bg-slate-100 h-32 flex items-center justify-center border-b border-slate-100 relative overflow-hidden group-hover:bg-navy/5 transition-colors">
+            <div class="w-32 h-20 bg-white rounded-md border border-slate-300 shadow-sm relative z-10 flex flex-col overflow-hidden">
+                <div class="h-3 border-b border-slate-200 bg-slate-50 flex items-center px-1 gap-1">
+                    <div class="w-1.5 h-1.5 rounded-full bg-slate-300"></div>
+                </div>
+                <div class="flex-1 p-2 flex gap-2 w-full">
+                    <div class="w-4 h-full bg-slate-100 rounded-sm"></div>
+                    <div class="flex-1 h-full flex flex-col gap-1 rounded-sm">
+                        <div class="h-4 bg-slate-50 rounded-sm w-full"></div>
+                        <div class="flex-1 bg-navy/5 rounded-sm w-full"></div>
+                    </div>
+                </div>
+            </div>
+            <i data-lucide="layout-dashboard" class="text-navy absolute z-20 bg-white/40 backdrop-blur-sm rounded-lg p-1" style="width:32px;height:32px;"></i>
+        </div>
+        <div class="p-6 flex-1 flex flex-col">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="bg-indigo-50 text-indigo-700 text-xs font-bold px-2 py-1 rounded">Control Center</span>
+            </div>
+            <h2 class="text-lg font-extrabold text-navy mb-2">Admin Dash</h2>
+            <p class="text-slate-500 text-sm mb-6 flex-1">Centralized monitoring of all pipelines and lifecycle statuses.</p>
+            <button onclick="handleAdminAccess(this)" class="inline-flex items-center justify-center gap-2 bg-navy hover:bg-navy/90 text-white font-bold py-2 px-4 rounded-xl transition-colors w-full shadow-md group/btn text-sm">
+                <i data-lucide="external-link" class="icon-default group-hover/btn:scale-110 transition-transform" style="width:16px;height:16px;"></i>
+                <i data-lucide="loader-2" class="icon-spinner" style="width:16px;height:16px;"></i>
+                <span class="btn-text">Access Module</span>
+            </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Trust Footer -->
+    <footer class="mt-auto pt-10 pb-4 fade-up delay-3">
+      <div class="border-t border-slate-200 pt-6 flex flex-col md:flex-row items-center justify-between text-xs text-slate-400 font-semibold gap-4">
+        <div class="flex items-center gap-2 text-slate-500">
+            <i data-lucide="shield-check" style="width:16px;height:16px;color:#10b981;"></i>
+            <span>Secure Enterprise System • 256-bit Encryption Active</span>
+        </div>
+        <div>
+            &copy; 2026 Farmasi Al Qanaah SDRS. Authorized Access Only.
+        </div>
+      </div>
+    </footer>
+
+  </main>
+
+  <script>
+      lucide.createIcons();
+
+      const SDRS_ORDER_VERSION_KEY = 'sdrs_main_orders_version';
+      const SDRS_ORDER_VERSION = '2';
+      const SDRS_SYNC_KEYS = [
+          'sdrs_main_orders',
+          'warehouseTransfers',
+          'driverQueue',
+          'driverHistory',
+          'outletIncomingQueue',
+          'outletHistory',
+          'adminGlobalPipeline',
+          'warehouse_xfer_data',
+          'driver_tasks',
+          'driver_history',
+          'outlet_incoming'
+      ];
+
+      function normalizeStatus(status) {
+          return String(status || '').trim().replace(/\s+/g, '_').toUpperCase();
+      }
+
+      function ensureOrderStorageVersion() {
+          const currentVersion = localStorage.getItem(SDRS_ORDER_VERSION_KEY);
+          if (currentVersion !== SDRS_ORDER_VERSION) {
+              console.debug('[SDRS] Updating storage version from', currentVersion, 'to', SDRS_ORDER_VERSION);
+              localStorage.setItem(SDRS_ORDER_VERSION_KEY, SDRS_ORDER_VERSION);
+          }
+      }
+
+      ensureOrderStorageVersion();
+      if (window.SDRS?.Auth) {
+          window.SDRS.Auth.renew();
+      }
+
+      function handleLoad(link) {
+          if (!link || !link.href) return false;
+          link.classList.add('btn-loading');
+          const textElement = link.querySelector('.btn-text');
+          if (textElement) {
+              textElement.textContent = 'Opening...';
+          }
+          setTimeout(() => {
+              window.location.href = link.href;
+          }, 200);
+          return true;
+      }
+
+      function handleAdminAccess(element) {
+          element.disabled = true;
+          element.classList.add('btn-loading');
+          element.querySelector('.btn-text').textContent = 'Connecting...';
+          console.debug('[SDRS] handleAdminAccess - navigating to admin module');
+          setTimeout(() => {
+              window.location.href = 'admin/index.html';
+          }, 400);
+      }
+
+      const SDRSStorageManager = {
+          load(key) {
+              try {
+                  const raw = localStorage.getItem(key);
+                  if (!raw) return [];
+                  const parsed = JSON.parse(raw);
+                  if (Array.isArray(parsed)) return parsed;
+                  if (parsed && typeof parsed === 'object' && Array.isArray(parsed.value)) {
+                      return parsed.value;
+                  }
+                  return [];
+              } catch (err) {
+                  console.warn('[SDRSStorageManager] unable to parse', key, err);
+                  return [];
+              }
+          },
+          save(key, data) {
+              try {
+                  console.debug('[SDRSStorageManager] save', key, data);
+                  localStorage.setItem(key, JSON.stringify(data));
+                  window.dispatchEvent(new Event('local_state_updated'));
+                  window.dispatchEvent(new Event('state_sync'));
+              } catch (err) {
+                  console.error('[SDRSStorageManager] save failed for', key, err);
+              }
+          },
+          loadArrays(keys) {
+              return keys.reduce((all, key) => all.concat(this.load(key)), []);
+          },
+          getAllOrders() {
+              const rawOrders = this.loadArrays([
+                  'sdrs_main_orders',
+                  'warehouseTransfers',
+                  'driverQueue',
+                  'driverHistory',
+                  'outletIncomingQueue',
+                  'outletHistory',
+                  'adminGlobalPipeline',
+                  'warehouse_xfer_data',
+                  'driver_tasks',
+                  'driver_history',
+                  'outlet_incoming'
+              ]);
+
+              const orderMap = new Map();
+              rawOrders.forEach(order => {
+                  if (!order || typeof order !== 'object') return;
+                  const id = String(order.id || order.transferId || order.orderId || '').trim();
+                  if (!id) return;
+                  const normalizedOrder = {
+                      ...order,
+                      status: normalizeStatus(order.status)
+                  };
+                  if (!orderMap.has(id)) {
+                      orderMap.set(id, normalizedOrder);
+                  } else {
+                      orderMap.set(id, {
+                          ...orderMap.get(id),
+                          ...normalizedOrder
+                      });
+                  }
+              });
+              return Array.from(orderMap.values());
+          }
+      };
+      window.SDRSStorageManager = SDRSStorageManager;
+
+      function syncDashboardStats() {
+          console.debug('[SDRS] syncDashboardStats start');
+          const orders = SDRSStorageManager.getAllOrders();
+          const total = orders.length;
+          const driverPending = orders.filter(o => ['CREATED', 'PENDING_DRIVER', 'PENDING'].includes(normalizeStatus(o.status))).length;
+          const outletPending = orders.filter(o => ['VERIFIED_BY_DRIVER'].includes(normalizeStatus(o.status))).length;
+          const completed = orders.filter(o => normalizeStatus(o.status) === 'COMPLETED').length;
+
+          const totalEl = document.getElementById('stat-total');
+          const driverPendingEl = document.getElementById('stat-driver-pending');
+          const outletPendingEl = document.getElementById('stat-outlet-pending');
+          const completedEl = document.getElementById('stat-completed');
+
+          if (totalEl) totalEl.textContent = String(total);
+          if (driverPendingEl) driverPendingEl.textContent = String(driverPending);
+          if (outletPendingEl) outletPendingEl.textContent = String(outletPending);
+          if (completedEl) completedEl.textContent = String(completed);
+
+          window.globalStats = { total, driverPending, outletPending, completed, timestamp: Date.now() };
+          console.debug('[SDRS] syncDashboardStats done', window.globalStats);
+      }
+
+      window.updateGlobalStats = syncDashboardStats;
+      window.updateDashboardStats = syncDashboardStats;
+
+      syncDashboardStats();
+
+      window.addEventListener('storage', (event) => {
+          console.debug('[SDRS] storage event', event.key, event.newValue ? 'updated' : 'removed');
+          if (!event.key || SDRS_SYNC_KEYS.includes(event.key)) {
+              syncDashboardStats();
+          }
+      });
+
+      window.addEventListener('local_state_updated', () => {
+          console.debug('[SDRS] local_state_updated event received');
+          syncDashboardStats();
+      });
+
+      window.addEventListener('state_sync', () => {
+          console.debug('[SDRS] state_sync event received');
+          syncDashboardStats();
+      });
+  </script>
+ </body>
+</html>

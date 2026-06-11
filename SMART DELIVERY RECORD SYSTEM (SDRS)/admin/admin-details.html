@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en" class="h-full">
+ <head>
+  <script src="../services/app.js"></script>
+  <script>
+    if (!window.SDRS?.Auth?.requireRole('admin', '../login.html')) {
+      // Redirect handled by session guard.
+    }
+  </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SDRS - Admin Details</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Inter', sans-serif; }
+    .card-shadow { box-shadow: 0 8px 32px rgba(15, 35, 65, 0.12); }
+    .soft-shadow { box-shadow: 0 4px 16px rgba(15, 35, 65, 0.08); }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-up { animation: fadeUp 0.6s ease-out both; }
+    .delay-1 { animation-delay: 0.1s; }
+    .delay-2 { animation-delay: 0.25s; }
+    table { border-collapse: collapse; width: 100%; }
+    table th, table td { border: 1px solid #E2E8F0; padding: 0.75rem 1rem; text-align: left; }
+    table th { position: sticky; top: 0; background: #F8FAFC; z-index: 10; font-weight: 600; }
+    table tbody tr:hover { background: #F8FAFC; }
+    @media print {
+      body { margin: 0; }
+      table { width: 100%; font-size: 12px; }
+      table th, table td { border: 1px solid #000; padding: 0.5rem; }
+      .no-print { display: none; }
+    }
+  </style>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: '#0F2341',
+            teal: '#2BA5B5',
+            'teal-light': '#E8F6F8',
+          }
+        }
+      }
+    }
+  </script>
+ </head>
+ <body class="h-full bg-slate-50 flex flex-col">
+
+   <header class="bg-white border-b border-slate-200 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <a href="index.html" class="text-slate-400 hover:text-navy transition-colors">
+            <i data-lucide="arrow-left" style="width:20px;height:20px;"></i>
+        </a>
+        <div class="w-10 h-10 bg-navy text-white rounded-lg flex items-center justify-center shadow-sm">
+          <i data-lucide="file-text" style="width:20px;height:20px;"></i>
+        </div>
+        <div>
+          <h1 class="text-xl font-extrabold text-navy tracking-tight leading-none">Delivery Details</h1>
+          <p class="text-[10px] uppercase font-bold text-teal tracking-widest leading-none mt-1">SDRS Logistics</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-4">
+        <button onclick="window.print()" class="bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-semibold px-4 py-2 rounded-lg transition-colors text-sm flex items-center gap-2 no-print"> <i data-lucide="printer" style="width:16px;height:16px;"></i> Print to PDF </button>
+        <button onclick="handleLogout()" class="flex items-center gap-2 text-slate-500 hover:text-red-600 px-3 py-2 rounded-xl text-sm font-bold hover:bg-red-50 transition-colors">
+            <i data-lucide="log-out" style="width:16px;height:16px;"></i> Logout
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div id="app" class="w-full flex-1 overflow-auto">
+   <div class="max-w-7xl mx-auto px-6 py-8">
+
+    <!-- Status Summary -->
+    <div class="bg-white border border-slate-200 rounded-2xl p-6 soft-shadow fade-up mb-6">
+      <h3 class="font-bold text-navy text-lg mb-4">Status Summary</h3>
+      <div id="statusSummary" class="flex items-center gap-4">
+        <!-- status badge here -->
+      </div>
+    </div>
+
+    <!-- Delivery Timeline -->
+    <div class="bg-white border border-slate-200 rounded-2xl p-6 soft-shadow fade-up delay-1 mb-6">
+      <h3 class="font-bold text-navy text-lg mb-4">Delivery Timeline</h3>
+      <div id="timeline" class="space-y-4">
+        <!-- timeline steps here -->
+      </div>
+    </div>
+
+    <!-- Detailed Item Breakdown -->
+    <div class="bg-white border border-slate-200 rounded-2xl p-6 soft-shadow fade-up delay-2">
+      <h3 class="font-bold text-navy text-lg mb-4">Detailed Item List</h3>
+      <div id="itemBreakdown" class="overflow-x-auto">
+        <table>
+          <thead>
+            <tr>
+              <th>No.</th>
+              <th>XFER Number</th>
+              <th>Expected Qty</th>
+              <th>Received Qty</th>
+              <th>Status</th>
+              <th>Staff Remarks</th>
+            </tr>
+          </thead>
+          <tbody id="itemTableBody">
+            <!-- rows injected -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+   </div>
+  </div>
+
+  <script>
+      function handleLogout() {
+          localStorage.removeItem('isAdminLoggedIn');
+          window.location.href = '../index.html';
+      }
+
+      function getQueryParam(param) {
+          const urlParams = new URLSearchParams(window.location.search);
+          return urlParams.get(param);
+      }
+
+      function loadOrderDetails() {
+          const orderId = getQueryParam('id');
+          const manager = window.SDRSStateManager;
+          const orders = window.getMainOrders ? window.getMainOrders() : (manager ? manager.getState('adminGlobalPipeline') : (JSON.parse(localStorage.getItem('adminGlobalPipeline') || localStorage.getItem('sdrs_main_orders') || '[]')));
+          let order = null;
+          if (orderId) {
+              order = orders.find(o => String(o.id) === String(orderId));
+          } else {
+              // If no ID, show first order or all? For now, show first if exists
+              order = orders[0];
+          }
+
+          if (!order) {
+              document.getElementById('statusSummary').innerHTML = '<p class="text-slate-500">No order found.</p>';
+              return;
+          }
+
+          // Status Summary
+          const isCompleted = order.status === 'COMPLETED';
+          const statusLabel = isCompleted ? 'Completed' : 'Pending';
+          const statusColor = isCompleted ? 'green' : 'orange';
+          const statusBadge = `<span class="inline-flex items-center rounded-full px-4 py-2 text-sm font-bold" style="background:${statusColor === 'green' ? '#DCFCE7' : '#FFEDD5'}; color:${statusColor === 'green' ? '#166534' : '#C2410C'};">${statusLabel}</span>`;
+          document.getElementById('statusSummary').innerHTML = `
+            <div class="flex items-center gap-4">
+              <span class="text-sm font-medium text-slate-600">Order ID:</span>
+              <span class="font-bold text-navy">${order.id}</span>
+              <span class="text-sm font-medium text-slate-600">Status:</span>
+              ${statusBadge}
+            </div>
+          `;
+
+          // Delivery Timeline
+          const timeline = [];
+          timeline.push({
+            step: 'Order Created',
+            time: order.createdAt || '--',
+            status: 'completed'
+          });
+          if (order.status !== 'CREATED') {
+            timeline.push({
+              step: 'Driver Verified',
+              time: order.verifiedAt || '--',
+              status: 'completed'
+            });
+          }
+          if (order.status === 'VERIFIED_BY_DRIVER') {
+            timeline.push({
+              step: 'In Transit',
+              time: '--',
+              status: 'current'
+            });
+          }
+          if (order.status === 'COMPLETED') {
+            timeline.push({
+              step: 'Delivered',
+              time: order.receivedAt || '--',
+              status: 'completed'
+            });
+          }
+
+          const timelineHtml = timeline.map(t => `
+            <div class="flex items-center gap-4">
+              <div class="w-3 h-3 rounded-full ${t.status === 'completed' ? 'bg-green-500' : t.status === 'current' ? 'bg-orange-500' : 'bg-slate-300'}"></div>
+              <span class="text-sm font-medium text-slate-700">${t.step}</span>
+              <span class="text-sm text-slate-500">${t.time}</span>
+            </div>
+          `).join('');
+          document.getElementById('timeline').innerHTML = timelineHtml;
+
+          // Detailed Item Breakdown
+          const manager = window.SDRSStateManager;
+          const complaints = manager ? manager.getState('complaints') : (JSON.parse(localStorage.getItem('sdrs_complaints')) || []);
+          const xfers = order.xfers || [];
+          const tbody = document.getElementById('itemTableBody');
+          if (xfers.length === 0) {
+              tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-slate-500">No items.</td></tr>';
+          } else {
+              const rows = xfers.map((xfer, index) => {
+                  const expectedQty = xfer.totalBoxes || 0;
+                  const receivedItem = (order.receivedItems || []).find(item => item.name === xfer.xferNumber || item.name === xfer.id);
+                  const receivedQty = receivedItem?.receivedQty ?? (order.status === 'COMPLETED' ? expectedQty : 0);
+                  const complaint = complaints.find(c => String(c.orderId) === String(order.id) && [xfer.xferNumber, xfer.id, xfer.name].some(key => key && String(key) === String(c.xfer)));
+                  const rawRemark = complaint?.remark || xfer.remark || receivedItem?.remark || '';
+                  const remark = rawRemark.trim() || 'Completed with no complaints';
+                  const hasComplaint = !!rawRemark.trim();
+                  const status = (receivedQty !== expectedQty || hasComplaint) ? 'Mismatch' : 'Completed';
+                  const statusClass = status === 'Completed' ? 'text-green-700' : 'text-red-700';
+                  return `
+                      <tr>
+                          <td>${index + 1}</td>
+                          <td>${xfer.xferNumber || xfer.id || 'Tidak Diketahui'}</td>
+                          <td>${expectedQty}</td>
+                          <td>${receivedQty}</td>
+                          <td class="${statusClass} font-semibold">${status}</td>
+                          <td>${remark}</td>
+                      </tr>
+                  `;
+              }).join('');
+              tbody.innerHTML = rows;
+          }
+
+          if (window.lucide) window.lucide.createIcons();
+      }
+
+      document.addEventListener('DOMContentLoaded', loadOrderDetails);
+  </script>
+ </body>
+</html>

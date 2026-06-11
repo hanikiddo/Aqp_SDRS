@@ -1,0 +1,615 @@
+﻿<!doctype html>
+<html lang="en" class="h-full antialiased">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SDRS - Outlet Verification</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .card-shadow { box-shadow: 0 24px 60px rgba(15, 35, 65, 0.08); }
+    .btn-transition { transition: background-color 0.25s ease, transform 0.25s ease; }
+    .section-card { border-radius: 1.75rem; }
+    .status-badge { transition: background-color 0.25s ease, color 0.25s ease; }
+    .receipt-panel { transition: border-color 0.25s ease, background-color 0.25s ease, color 0.25s ease; }
+    .disabled-cursor { cursor: not-allowed; }
+  </style>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: '#0F2341',
+            sky: {
+              600: '#0ea5e9',
+              700: '#0284c7'
+            },
+            orange: {
+              100: '#ffedd5',
+              300: '#fdba74',
+              700: '#c2410c'
+            },
+            purple: {
+              100: '#ede9fe',
+              300: '#c4b5fd',
+              700: '#6d28d9'
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-900">
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+    <div class="max-w-3xl mx-auto px-4 h-16 flex items-center gap-3">
+      <a href="index.html" class="text-slate-400 hover:text-slate-900 transition-colors">
+        <i data-lucide="arrow-left" class="w-5 h-5"></i>
+      </a>
+      <div class="w-11 h-11 bg-sky-600 text-white rounded-3xl flex items-center justify-center shadow-sm">
+        <i data-lucide="check-circle" class="w-5 h-5"></i>
+      </div>
+      <div>
+        <h1 class="text-lg font-extrabold tracking-tight text-slate-950">Outlet Verification</h1>
+        <p class="text-[10px] uppercase font-bold tracking-[0.35em] text-sky-600 mt-1">Confirm incoming boxes</p>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-3xl mx-auto px-4 py-6">
+    <section class="bg-white border border-slate-200 section-card card-shadow overflow-hidden">
+      <div class="px-6 py-6 border-b border-slate-200">
+        <p class="text-xs uppercase tracking-[0.35em] font-bold text-slate-500">Order</p>
+        <h2 id="orderTitle" class="text-3xl font-extrabold text-slate-950 mt-1">Loading order...</h2>
+        <p class="mt-2 text-sm text-slate-500">Verify each item and complete the delivery only after confirming all boxes.</p>
+      </div>
+      <div class="p-6">
+        <div id="communicationContainer" class="space-y-4 mb-5"></div>
+        <form id="verifyForm" onsubmit="completeOrder(event)" class="space-y-5">
+          <div id="itemsContainer" class="space-y-4"></div>
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <a href="index.html" class="inline-flex items-center justify-center rounded-3xl border border-slate-200 bg-white px-6 py-4 text-sm font-bold text-slate-900 hover:bg-slate-50 transition">Cancel</a>
+            <button type="submit" id="submitBtn" disabled class="inline-flex w-full sm:w-auto items-center justify-center rounded-3xl bg-slate-300 px-6 py-4 text-sm font-bold text-slate-500 cursor-not-allowed btn-transition shadow-lg">
+              <i data-lucide="check-circle" class="w-4 h-4 mr-2"></i>
+              Complete Order
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <div id="toastContainer" class="fixed bottom-6 right-6 z-50"></div>
+
+  <script src="../shared/state.js"></script>
+  <script>
+    lucide.createIcons();
+
+    let currentOrder = null;
+
+    function showToast(message) {
+      const toast = document.createElement('div');
+      toast.className = 'rounded-3xl bg-slate-950 text-white px-5 py-3 shadow-2xl';
+      toast.textContent = message;
+      document.getElementById('toastContainer').appendChild(toast);
+      setTimeout(() => toast.remove(), 3200);
+    }
+
+    function getProgressKey(orderId) {
+      return `sdrs_outlet_progress_${orderId}`;
+    }
+
+    function loadProgress() {
+      if (!currentOrder?.id) return [];
+      try {
+        return JSON.parse(sessionStorage.getItem(getProgressKey(currentOrder.id)) || '[]');
+      } catch {
+        return [];
+      }
+    }
+
+    function saveProgress() {
+      if (!currentOrder?.id || currentOrder.status === 'COMPLETED') return;
+      const state = Array.from(document.querySelectorAll('#itemsContainer > .item-card')).map((card, idx) => ({
+        itemIndex: idx,
+        status: card.dataset.status || 'pending',
+        confirmed: card.dataset.status === 'confirmed',
+        receivedQty: parseInt(card.querySelector('select.qty-select')?.value || '0', 10),
+        remark: card.querySelector('.item-remark')?.value.trim() || ''
+      }));
+      sessionStorage.setItem(getProgressKey(currentOrder.id), JSON.stringify(state));
+    }
+
+    function getOrderCommunications(orderId) {
+      const complaints = JSON.parse(localStorage.getItem('sdrs_complaints') || '[]');
+      return complaints
+        .filter(c => [c.orderId, c.transferId, c.dispatchId, c.transfer].some(key => String(key) === String(orderId)))
+        .sort((a, b) => (a.time || 0) - (b.time || 0));
+    }
+
+    function groupCommunicationsByXfer(communications) {
+      return communications.reduce((groups, communication) => {
+        const xferKey = communication.xfer || communication.transfer || 'General';
+        if (!groups[xferKey]) groups[xferKey] = [];
+        groups[xferKey].push(communication);
+        return groups;
+      }, {});
+    }
+
+    function renderCommunications() {
+      const container = document.getElementById('communicationContainer');
+      if (!currentOrder?.id) {
+        container.innerHTML = '';
+        return;
+      }
+      const communications = getOrderCommunications(currentOrder.id);
+      if (!communications.length) {
+        container.innerHTML = '';
+        return;
+      }
+
+      const grouped = groupCommunicationsByXfer(communications);
+      const historyHtml = Object.entries(grouped).map(([xfer, items]) => {
+        const itemRows = items.map(item => {
+          const complaintDate = new Date(item.time || 0).toLocaleString();
+          const replySection = item.response ? `
+            <div class="mt-3 rounded-2xl bg-slate-50 border border-slate-200 p-4">
+              <div class="text-[10px] uppercase tracking-[0.35em] font-bold text-slate-700 mb-2">Admin Reply</div>
+              <div class="text-sm text-slate-900 font-semibold">${item.response}</div>
+              <div class="mt-2 text-[11px] text-slate-500">By ${item.responseBy || 'Admin'} • ${new Date(item.responseTime || item.time || 0).toLocaleString()}</div>
+            </div>
+          ` : '';
+          return `
+            <div class="mb-4 rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <div class="text-[10px] uppercase tracking-[0.35em] font-bold text-orange-700 mb-2">${item.status || 'NEW'}</div>
+                  <div class="text-sm text-slate-900 font-semibold">${item.remark || 'No remark provided.'}</div>
+                </div>
+                <div class="text-[11px] text-slate-500">${complaintDate}</div>
+              </div>
+              ${replySection}
+            </div>
+          `;
+        }).join('');
+
+        return `
+          <div class="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-4 mb-4">
+            <div class="flex items-center justify-between gap-3 mb-4">
+              <div>
+                <div class="text-[10px] uppercase tracking-[0.35em] font-bold text-slate-500 mb-1">XFER</div>
+                <div class="text-sm font-bold text-slate-900">${xfer}</div>
+              </div>
+              <div class="text-[11px] uppercase tracking-[0.35em] font-bold text-slate-500">${items.length} record${items.length > 1 ? 's' : ''}</div>
+            </div>
+            ${itemRows}
+          </div>
+        `;
+      }).join('');
+
+      container.innerHTML = `
+        <div class="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-4">
+          <div class="text-[10px] uppercase tracking-[0.35em] font-bold text-slate-500 mb-2">Complaint History</div>
+          ${historyHtml}
+        </div>
+      `;
+    }
+
+    function toItemName(item, idx) {
+      if (typeof item === 'string') return item;
+      return item.name || item.xferNumber || item.xferNo || item.sku || `Item ${idx + 1}`;
+    }
+
+    function toQty(item) {
+      return parseInt(item.qty || item.expectedQty || item.totalBoxes || item.boxes || 1, 10) || 1;
+    }
+
+    function buildItemCard(item, idx, savedState = {}) {
+      const itemName = toItemName(item, idx);
+      const expectedQty = toQty(item);
+      const savedReceivedQty = savedState.receivedQty != null ? parseInt(savedState.receivedQty, 10) : expectedQty;
+      const receivedQty = Number.isNaN(savedReceivedQty) ? expectedQty : savedReceivedQty;
+      let status = savedState.status || 'pending';
+      if (status === 'confirmed' && receivedQty !== expectedQty) status = 'pending';
+      if (status === 'shortage' && receivedQty >= expectedQty) status = 'pending';
+      const confirmed = status === 'confirmed';
+      const shortage = status === 'shortage';
+      const statusLabel = confirmed ? 'CONFIRMED' : shortage ? 'SHORTAGE' : 'PENDING';
+      const statusClass = confirmed ? 'bg-purple-100 border-purple-300 text-purple-700' : shortage ? 'bg-rose-100 border-rose-300 text-rose-700' : 'bg-orange-100 border-orange-300 text-orange-700';
+      const receivedLabelClass = confirmed ? 'text-purple-700' : shortage ? 'text-rose-700' : 'text-orange-700';
+      const receivedBoxClass = confirmed ? 'border-purple-300 bg-purple-50' : shortage ? 'border-rose-300 bg-rose-50' : 'border-orange-300 bg-orange-50';
+      const inputDisabled = confirmed ? 'disabled' : '';
+
+      const options = Array.from({ length: Math.max(expectedQty, 10) }, (_, q) => {
+        const value = q + 1;
+        return `<option value="${value}" ${value === receivedQty ? 'selected' : ''}>${value}</option>`;
+      }).join('');
+
+      return `
+        <div class="item-card rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm" data-status="${status}" data-confirmed="${confirmed ? 'true' : 'false'}" data-index="${idx}">
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div class="space-y-2">
+              <div class="text-xs uppercase tracking-[0.35em] text-slate-400 font-bold">Item ${idx + 1}</div>
+              <div class="text-lg font-bold text-slate-950">${itemName}</div>
+            </div>
+            <span class="status-badge inline-flex items-center rounded-full border px-3 py-2 text-[11px] font-bold uppercase tracking-[0.3em] ${statusClass}">${statusLabel}</span>
+          </div>
+
+          <div class="mt-5 grid gap-4 lg:grid-cols-[1fr_auto] items-start">
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div class="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                <div class="text-[10px] uppercase tracking-[0.35em] text-slate-500 mb-2">Expected Qty</div>
+                <div class="text-2xl font-extrabold text-slate-950">${expectedQty}</div>
+              </div>
+              <div class="receipt-panel rounded-3xl border ${receivedBoxClass} p-4">
+                <div class="received-label text-[10px] uppercase tracking-[0.35em] font-bold ${receivedLabelClass} mb-2">Received Qty</div>
+                <select onchange="selectQty(this)" ${inputDisabled} class="qty-select w-full rounded-3xl border ${receivedBoxClass} bg-white px-4 py-3 text-sm font-semibold ${receivedLabelClass} outline-none focus:ring-2 ${confirmed ? 'focus:ring-purple-300' : shortage ? 'focus:ring-rose-300' : 'focus:ring-orange-300'}">
+                  ${options}
+                </select>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <button type="button" onclick="toggleConfirm(this)" title="${confirmed ? 'Confirmed' : 'Confirm this item'}" class="confirm-btn inline-flex h-14 w-14 items-center justify-center rounded-[1.5rem] bg-sky-600 text-white shadow-lg hover:bg-sky-700 btn-transition">
+                <i data-lucide="check" class="w-5 h-5"></i>
+              </button>
+              <button type="button" onclick="markShortage(this)" title="Mark as insufficient boxes" class="shortage-btn inline-flex h-14 w-14 items-center justify-center rounded-[1.5rem] bg-rose-600 text-white shadow-lg hover:bg-rose-700 btn-transition">
+                <i data-lucide="alert-circle" class="w-5 h-5"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="mt-5">
+            <label class="text-[10px] uppercase tracking-[0.35em] text-slate-500 font-bold">Remarks</label>
+            <textarea ${inputDisabled} class="item-remark mt-2 w-full rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-900 outline-none" rows="3" placeholder="Optional notes, damage, missing items">${savedState.remark || ''}</textarea>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderItems() {
+      const container = document.getElementById('itemsContainer');
+      const savedState = loadProgress();
+      const completedState = (currentOrder.receivedItems || []).map((item, idx) => ({
+        itemIndex: idx,
+        status: 'confirmed',
+        confirmed: true,
+        receivedQty: item.receivedQty || item.expectedQty || item.qty || 1,
+        remark: item.remark || ''
+      }));
+      container.innerHTML = '';
+
+      currentOrder.items.forEach((item, idx) => {
+        const itemState = savedState.find(state => state.itemIndex === idx)
+                        || completedState.find(state => state.itemIndex === idx)
+                        || {};
+        container.insertAdjacentHTML('beforeend', buildItemCard(item, idx, itemState));
+      });
+
+      lucide.createIcons();
+      updateSubmitState();
+    }
+
+    function selectQty(select) {
+      const card = select.closest('[data-status]');
+      if (!card) return;
+      if (card.dataset.status === 'confirmed') return;
+      saveProgress();
+      updateSubmitState();
+    }
+
+    function toggleConfirm(button) {
+      const card = button.closest('[data-status]');
+      if (!card) return;
+      if (card.dataset.status === 'confirmed') {
+        resetCard(card);
+      } else {
+        confirmCard(card);
+      }
+      saveProgress();
+      updateSubmitState();
+    }
+
+    function confirmCard(card) {
+      const expectedQty = parseInt(card.querySelector('.text-2xl')?.textContent || '0', 10);
+      const select = card.querySelector('select.qty-select');
+      const receivedQty = parseInt(select?.value || '0', 10);
+      if (receivedQty !== expectedQty) {
+        showToast('Qty must match expected before confirming.');
+        return;
+      }
+      card.dataset.status = 'confirmed';
+      card.dataset.confirmed = 'true';
+      card.querySelector('.status-badge').className = 'status-badge inline-flex items-center rounded-full border border-purple-300 bg-purple-100 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.3em] text-purple-700';
+      card.querySelector('.status-badge').textContent = 'CONFIRMED';
+      const receivedPanel = card.querySelector('.receipt-panel');
+      receivedPanel.className = 'receipt-panel rounded-3xl border border-purple-300 bg-purple-50 p-4';
+      card.querySelector('.received-label').className = 'received-label text-[10px] uppercase tracking-[0.35em] font-bold text-purple-700 mb-2';
+      select.disabled = true;
+      card.querySelector('.item-remark').disabled = false;
+      lucide.createIcons();
+    }
+
+    function markShortage(button) {
+      const card = button.closest('[data-status]');
+      if (!card) return;
+      const expectedQty = parseInt(card.querySelector('.text-2xl')?.textContent || '0', 10);
+      const select = card.querySelector('select.qty-select');
+      const receivedQty = parseInt(select?.value || '0', 10);
+      if (receivedQty === expectedQty) {
+        showToast('Use confirm if qty matches expected.');
+        return;
+      }
+      card.dataset.status = 'shortage';
+      card.dataset.confirmed = 'false';
+      card.querySelector('.status-badge').className = 'status-badge inline-flex items-center rounded-full border border-rose-300 bg-rose-100 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.3em] text-rose-700';
+      card.querySelector('.status-badge').textContent = 'SHORTAGE';
+      const receivedPanel = card.querySelector('.receipt-panel');
+      receivedPanel.className = 'receipt-panel rounded-3xl border border-rose-300 bg-rose-50 p-4';
+      card.querySelector('.received-label').className = 'received-label text-[10px] uppercase tracking-[0.35em] font-bold text-rose-700 mb-2';
+      card.querySelector('.item-remark').disabled = false;
+      lucide.createIcons();
+      showToast('Marked as insufficient boxes.');
+    }
+
+    function resetCard(card) {
+      card.dataset.status = 'pending';
+      card.dataset.confirmed = 'false';
+      card.querySelector('.status-badge').className = 'status-badge inline-flex items-center rounded-full border border-orange-300 bg-orange-100 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.3em] text-orange-700';
+      card.querySelector('.status-badge').textContent = 'PENDING';
+      const receivedPanel = card.querySelector('.receipt-panel');
+      receivedPanel.className = 'receipt-panel rounded-3xl border border-orange-300 bg-orange-50 p-4';
+      card.querySelector('.received-label').className = 'received-label text-[10px] uppercase tracking-[0.35em] font-bold text-orange-700 mb-2';
+      const select = card.querySelector('select.qty-select');
+      select.disabled = false;
+      card.querySelector('.item-remark').disabled = false;
+      lucide.createIcons();
+    }
+
+    function updateSubmitState() {
+      const cards = Array.from(document.querySelectorAll('#itemsContainer > .item-card'));
+      const submitBtn = document.getElementById('submitBtn');
+      const allReady = cards.length > 0 && cards.every(card => card.dataset.status && card.dataset.status !== 'pending');
+      if (allReady) {
+        submitBtn.disabled = false;
+        submitBtn.className = 'inline-flex w-full sm:w-auto items-center justify-center rounded-3xl bg-sky-600 px-6 py-4 text-sm font-bold text-white hover:bg-sky-700 btn-transition shadow-lg';
+      } else {
+        submitBtn.disabled = true;
+        submitBtn.className = 'inline-flex w-full sm:w-auto items-center justify-center rounded-3xl bg-slate-300 px-6 py-4 text-sm font-bold text-slate-500 cursor-not-allowed btn-transition shadow-lg disabled-cursor';
+      }
+    }
+
+    function completeOrder(e) {
+      e.preventDefault();
+      const cards = Array.from(document.querySelectorAll('#itemsContainer > .item-card'));
+      const readyCards = cards.filter(card => card.dataset.status && card.dataset.status !== 'pending');
+      if (readyCards.length !== cards.length) {
+        showToast('Confirm or mark shortage for all items before completing.');
+        return;
+      }
+
+      const verifiedItems = readyCards.map((card, index) => ({
+        status: card.dataset.status || 'pending',
+        name: card.querySelector('div.text-lg')?.textContent || `Item ${index + 1}`,
+        expectedQty: parseInt(card.querySelector('.text-2xl')?.textContent || '0', 10),
+        receivedQty: parseInt(card.querySelector('select.qty-select')?.value || '0', 10),
+        remark: card.querySelector('.item-remark')?.value.trim() || ''
+      }));
+
+      const manager = window.SDRSStateManager;
+      const complaints = manager ? manager.getState('complaints') : JSON.parse(localStorage.getItem('sdrs_complaints') || '[]');
+      const updatedComplaints = [...complaints];
+
+      verifiedItems.forEach(item => {
+        if (item.remark) {
+          updatedComplaints.push({
+            orderId: currentOrder.id,
+            transferId: currentOrder.id,
+            outletId: currentOrder.outletId || '',
+            outletName: currentOrder.outletName || currentOrder.outlet || '',
+            xfer: item.name,
+            remark: item.remark,
+            time: Date.now(),
+            status: 'NEW',
+            verificationStatus: currentOrder.status || 'VERIFIED_BY_DRIVER'
+          });
+        }
+      });
+
+      if (manager) {
+        manager.setState('complaints', updatedComplaints);
+      } else {
+        localStorage.setItem('sdrs_complaints', JSON.stringify(updatedComplaints));
+      }
+
+      currentOrder.status = 'COMPLETED';
+      currentOrder.outletStatus = 'COMPLETED';
+      currentOrder.receivedAt = new Date().toISOString();
+      currentOrder.completedAt = currentOrder.receivedAt;
+      currentOrder.receivedItems = verifiedItems;
+      currentOrder.hasIssue = verifiedItems.some(item => item.remark !== '' || item.status === 'shortage');
+      currentOrder.timestamps = {
+        ...(currentOrder.timestamps || {}),
+        completedAt: Date.now()
+      };
+
+      const historyRecord = {
+        outletId: currentOrder.outletId || currentOrder.outlet || currentOrder.destination || currentOrder.branchName,
+        outletName: currentOrder.outletName || currentOrder.outlet || currentOrder.destination || currentOrder.branchName || 'Unknown Outlet',
+        orderId: currentOrder.id,
+        completedAt: currentOrder.completedAt,
+        xferNumbers: (currentOrder.receivedItems || []).map(item => item.name || item.xfer || 'Unknown XFER'),
+        receivedItems: currentOrder.receivedItems || [],
+        hasIssue: !!currentOrder.hasIssue
+      };
+
+      if (manager) {
+        manager.updateState('warehouseTransfers', (orders) => orders.map((o) => {
+          if (String(o.id) === String(currentOrder.id) || String(o.transferId) === String(currentOrder.id)) {
+            return { ...o, ...currentOrder };
+          }
+          return o;
+        }));
+        manager.updateState('outletIncomingQueue', (queue) => queue.filter((o) => String(o.id) !== String(currentOrder.id)));
+        manager.appendState('outletHistory', historyRecord);
+        manager.updateState('adminGlobalPipeline', (pipeline) => {
+          const idx = pipeline.findIndex((entry) => String(entry.transferId) === String(currentOrder.id) || String(entry.id) === String(currentOrder.id));
+          if (idx === -1) return [...pipeline, { ...currentOrder }];
+          const next = [...pipeline];
+          next[idx] = {
+            ...next[idx],
+            ...currentOrder,
+            status: 'COMPLETED',
+            outletStatus: 'COMPLETED'
+          };
+          return next;
+        });
+        manager.syncAllModules();
+      } else {
+        let fallbackOrders = [];
+        try { fallbackOrders = JSON.parse(localStorage.getItem('sdrs_main_orders') || '[]'); } catch { fallbackOrders = []; }
+        if (Array.isArray(fallbackOrders)) {
+          const orderIndex = fallbackOrders.findIndex(o => String(o.id) === String(currentOrder.id));
+          if (orderIndex !== -1) {
+            fallbackOrders[orderIndex] = currentOrder;
+            localStorage.setItem('sdrs_main_orders', JSON.stringify(fallbackOrders));
+          }
+        }
+
+        let incomingQueue = [];
+        try { incomingQueue = JSON.parse(localStorage.getItem('outletIncomingQueue') || '[]'); } catch { incomingQueue = []; }
+        if (Array.isArray(incomingQueue)) {
+          localStorage.setItem('outletIncomingQueue', JSON.stringify(incomingQueue.filter(o => String(o.id) !== String(currentOrder.id))));
+        }
+
+        appendOutletHistory(currentOrder);
+      }
+
+      localStorage.setItem('sdrs_last_completed_order', JSON.stringify({
+        id: currentOrder.id,
+        outletId: currentOrder.outletId,
+        outletName: currentOrder.outletName || currentOrder.outlet || 'Unknown Outlet',
+        receivedAt: currentOrder.receivedAt,
+        receivedItems: verifiedItems,
+        hasIssue: currentOrder.hasIssue
+      }));
+
+      sessionStorage.removeItem(getProgressKey(currentOrder.id));
+      const submitBtn = document.getElementById('submitBtn');
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i data-lucide="loader" class="animate-spin w-4 h-4 mr-2"></i> Saving...';
+      lucide.createIcons();
+      setTimeout(() => window.location.href = `outlet-done.html?id=${encodeURIComponent(currentOrder.id)}`, 600);
+    }
+
+    function appendOutletHistory(order) {
+      if (!order) return;
+      const outletId = order.outletId || order.outlet || order.destination || order.outletName || order.branchName;
+      if (!outletId) return;
+      const orderKey = String(order.id || order.orderId || order.transferId || order.dispatchId || '').trim();
+      if (!orderKey) return;
+
+      const historyRecord = {
+        outletId: outletId,
+        outletName: order.outletName || order.outlet || order.destination || order.branchName || 'Unknown Outlet',
+        orderId: orderKey,
+        completedAt: order.completedAt || new Date().toISOString(),
+        xferNumbers: (order.receivedItems || []).map(item => item.name || item.xfer || 'Unknown XFER'),
+        receivedItems: order.receivedItems || [],
+        hasIssue: !!order.hasIssue
+      };
+
+      if (window.SDRSStateManager) {
+        window.SDRSStateManager.appendState('outletHistory', historyRecord);
+        window.SDRSStateManager.syncAllModules();
+        return;
+      }
+
+      let outletHistory = [];
+      try { outletHistory = JSON.parse(localStorage.getItem('outletHistory') || '[]'); } catch { outletHistory = []; }
+      outletHistory = outletHistory.filter(record => String(record.orderId || record.id || '').trim() !== orderKey);
+      outletHistory.push(historyRecord);
+      localStorage.setItem('outletHistory', JSON.stringify(outletHistory));
+      if (typeof loadAllStateFromStorage === 'function') {
+        loadAllStateFromStorage();
+      }
+      window.dispatchEvent(new Event('local_state_updated'));
+      window.dispatchEvent(new Event('state_sync'));
+    }
+
+    function normalizeOrder(rawOrder) {
+      if (!rawOrder) return null;
+      rawOrder.id = rawOrder.id || rawOrder.orderId || rawOrder.transferId || rawOrder.dispatchId;
+      rawOrder.outletName = rawOrder.outletName || rawOrder.destination || rawOrder.outlet || rawOrder.branchName;
+      rawOrder.items = rawOrder.items || rawOrder.payload || rawOrder.xferItems || rawOrder.itemList || [];
+      if (!rawOrder.items.length && Array.isArray(rawOrder.xfers)) {
+        rawOrder.items = rawOrder.xfers.map(x => ({ name: x.xferNumber || x.xferNo || x.sku || x.name || 'XFER', qty: x.totalBoxes || x.expectedQty || x.qty || x.boxes || 1 }));
+      }
+      return rawOrder;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const selectedId = new URLSearchParams(window.location.search).get('id');
+      if (!selectedId) {
+        document.getElementById('orderTitle').textContent = 'No order selected';
+        return;
+      }
+
+      if (typeof migrateOrderStorage === 'function') migrateOrderStorage();
+
+      let orders = [];
+      const keys = [
+        'sdrs_main_orders',
+        'sdrs_orders',
+        'orders',
+        'delivery_orders',
+        'outlet_orders',
+        'outletIncomingQueue',
+        'outlet_incoming',
+        'warehouseTransfers'
+      ];
+      keys.forEach(key => {
+        try {
+          const data = JSON.parse(localStorage.getItem(key) || '[]');
+          if (Array.isArray(data)) orders = orders.concat(data);
+        } catch (err) {
+          console.warn('Unable to parse', key, err);
+        }
+      });
+
+      // Also load from window.sdrsState if available
+      if (window.sdrsState?.outletIncomingQueue && Array.isArray(window.sdrsState.outletIncomingQueue)) {
+        orders = orders.concat(window.sdrsState.outletIncomingQueue);
+      }
+      if (window.sdrsState?.warehouseTransfers && Array.isArray(window.sdrsState.warehouseTransfers)) {
+        orders = orders.concat(window.sdrsState.warehouseTransfers);
+      }
+
+      currentOrder = orders.find(o => String(o.id) === selectedId || String(o.orderId) === selectedId || String(o.transferId) === selectedId || String(o.dispatchId) === selectedId);
+      if (!currentOrder) {
+        document.getElementById('orderTitle').textContent = 'Order not found';
+        return;
+      }
+
+      currentOrder = normalizeOrder(currentOrder);
+      document.getElementById('orderTitle').textContent = currentOrder.id;
+      renderItems();
+      renderCommunications();
+      if (currentOrder.status === 'COMPLETED') {
+        const submitBtn = document.getElementById('submitBtn');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Order Already Completed';
+        submitBtn.className = 'inline-flex w-full sm:w-auto items-center justify-center rounded-3xl bg-slate-300 px-6 py-4 text-sm font-bold text-slate-500 cursor-not-allowed btn-transition shadow-lg disabled-cursor';
+      }
+      document.getElementById('verifyForm').addEventListener('submit', completeOrder);
+
+      window.addEventListener('storage', (e) => {
+        if (e.key === 'sdrs_complaints' || e.key === null) {
+          renderCommunications();
+        }
+      });
+    });
+  </script>
+</body>
+</html>

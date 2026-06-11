@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en" class="h-full antialiased">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SDRS - Return Order</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .card-shadow { box-shadow: 0 4px 20px rgba(15, 35, 65, 0.08); }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-up { animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  </style>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: '#0F2341',
+            teal: '#2BA5B5',
+            'teal-light': '#E8F6F8',
+            corporate: {
+              50: '#f8fafc',
+              100: '#f1f5f9',
+              800: '#1e293b',
+              900: '#0f172a'
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-corporate-50 min-h-screen flex flex-col text-slate-800 pb-10">
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+    <div class="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <a href="index.html" class="text-slate-400 hover:text-navy transition-colors">
+            <i data-lucide="arrow-left" style="width:20px;height:20px;"></i>
+        </a>
+        <div class="w-8 h-8 bg-purple-500 text-white rounded-lg flex items-center justify-center shadow-sm">
+          <i data-lucide="repeat" style="width:18px;height:18px;"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-extrabold text-navy tracking-tight leading-none">Return Order</h1>
+          <p class="text-[10px] uppercase font-bold text-purple-500 tracking-widest leading-none mt-1">Outlet Return Processing</p>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-3xl w-full mx-auto p-4 flex flex-col fade-up">
+    <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden card-shadow mb-6">
+      <div class="bg-slate-50 border-b border-slate-200 p-5">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <h2 class="text-navy font-extrabold text-lg">Create Return Order</h2>
+            <p class="text-slate-500 text-sm mt-1">Select XFER and return boxes with reasons.</p>
+          </div>
+        </div>
+      </div>
+      <div class="p-6 space-y-6">
+        <div>
+          <label class="block text-sm font-bold text-navy mb-2">Select XFER</label>
+          <select id="xferSelect" class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-teal focus:border-teal transition-shadow">
+            <option value="">Choose XFER</option>
+          </select>
+        </div>
+
+        <div id="orderDetails" class="space-y-4 hidden">
+          <div class="grid grid-cols-2 gap-3">
+            <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+              <div class="text-xs uppercase tracking-wider text-slate-400 font-bold mb-2">Outlet</div>
+              <div id="outletName" class="text-sm font-semibold text-navy">-</div>
+            </div>
+            <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+              <div class="text-xs uppercase tracking-wider text-slate-400 font-bold mb-2">Outlet ID</div>
+              <div id="outletId" class="text-sm font-semibold text-navy">-</div>
+            </div>
+            <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+              <div class="text-xs uppercase tracking-wider text-slate-400 font-bold mb-2">Date</div>
+              <div id="orderDate" class="text-sm font-semibold text-navy">-</div>
+            </div>
+            <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+              <div class="text-xs uppercase tracking-wider text-slate-400 font-bold mb-2">XFER</div>
+              <div id="orderXfer" class="text-sm font-semibold text-navy">-</div>
+            </div>
+          </div>
+
+          <div id="itemsContainer" class="space-y-4"></div>
+
+          <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 grid grid-cols-3 gap-3">
+            <div class="text-center">
+              <div class="text-xs uppercase tracking-wider text-slate-400 font-bold mb-2">Expected</div>
+              <div id="summaryExpected" class="text-2xl font-extrabold text-navy">0</div>
+            </div>
+            <div class="text-center">
+              <div class="text-xs uppercase tracking-wider text-slate-400 font-bold mb-2">Returned</div>
+              <div id="summaryReturned" class="text-2xl font-extrabold text-teal">0</div>
+            </div>
+            <div class="text-center">
+              <div class="text-xs uppercase tracking-wider text-slate-400 font-bold mb-2">Balance</div>
+              <div id="summaryBalance" class="text-2xl font-extrabold text-slate-700">0</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row gap-3 justify-between">
+          <a href="index.html" class="w-full sm:w-1/3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-bold py-3 px-4 rounded-xl transition-all shadow-sm text-center">Back</a>
+          <button id="submitBtn" type="button" disabled class="w-full sm:w-2/3 bg-slate-300 text-slate-500 font-bold py-3 px-4 rounded-xl transition-all shadow-sm cursor-not-allowed">Submit Return</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="../shared/state.js"></script>
+  <script>
+    window.addEventListener('storage', () => {
+      location.reload();
+    });
+
+    lucide.createIcons();
+
+    const reasonOptions = [
+      { value: '', label: 'Choose reason' },
+      { value: 'damaged', label: 'Damaged' },
+      { value: 'wrong_item', label: 'Wrong item' },
+      { value: 'expired', label: 'Expired' },
+      { value: 'other', label: 'Other' }
+    ];
+
+    let allOrders = [];
+    let activeOrder = null;
+    let returnItems = [];
+
+    window.onload = () => {
+      loadOrders();
+      document.getElementById('xferSelect').addEventListener('change', onXferChange);
+      document.getElementById('submitBtn').addEventListener('click', submitReturn);
+    };
+
+    function loadOrders() {
+      allOrders = (window.sdrsOrders || []).map(order => ({
+        ...order,
+        created_at: order.created_at || order.createdTimestamp || order.created_timestamp || new Date().toISOString(),
+        outletName: order.outletName || order.outlet || order.destination || 'Unknown Outlet',
+        outletId: order.outletId || order.outlet || '',
+        items: order.items || order.xferItems || order.xfers || []
+      }));
+
+      const select = document.getElementById('xferSelect');
+      select.innerHTML = '<option value="">Choose XFER</option>';
+
+      allOrders.forEach(order => {
+        const option = document.createElement('option');
+        option.value = order.id;
+        option.textContent = `${order.id} — ${order.outletName}`;
+        select.appendChild(option);
+      });
+
+      const saved = JSON.parse(localStorage.getItem('returnOrderDraft') || '{}');
+      if (saved.orderId) {
+        select.value = saved.orderId;
+      }
+
+      if (select.value) {
+        onXferChange();
+      }
+    }
+
+    function onXferChange() {
+      const orderId = document.getElementById('xferSelect').value;
+      const detailPane = document.getElementById('orderDetails');
+
+      activeOrder = allOrders.find(order => order.id === orderId) || null;
+      if (!activeOrder) {
+        detailPane.classList.add('hidden');
+        returnItems = [];
+        updateSummary();
+        return;
+      }
+
+      detailPane.classList.remove('hidden');
+      document.getElementById('outletName').textContent = activeOrder.outlet || 'Unknown';
+      document.getElementById('outletId').textContent = activeOrder.outletId || activeOrder.outlet || '-';
+      document.getElementById('orderDate').textContent = new Date(activeOrder.created_at).toLocaleString('en-MY', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      document.getElementById('orderXfer').textContent = activeOrder.id;
+
+      const savedDraft = JSON.parse(localStorage.getItem('returnOrderDraft') || '{}');
+      const savedOrder = savedDraft.orderId === activeOrder.id ? savedDraft.items : null;
+
+      returnItems = (activeOrder.items || []).map((item, idx) => ({
+        id: item.id || `item-${idx}`,
+        name: item.name || item.sku || item.xferNumber || `Item ${idx + 1}`,
+        expected: Number(item.qty ?? item.expected ?? item.totalBoxes ?? 0),
+        returned: savedOrder?.[idx]?.returned || 0,
+        reason: savedOrder?.[idx]?.reason || ''
+      }));
+
+      renderItems();
+      updateSummary();
+    }
+
+    function renderItems() {
+      const itemsContainer = document.getElementById('itemsContainer');
+      itemsContainer.innerHTML = '';
+
+      returnItems.forEach((item, index) => {
+        const card = document.createElement('div');
+        card.className = 'bg-white border border-slate-200 rounded-2xl p-4 shadow-sm';
+
+        card.innerHTML = `
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <div class="text-xs uppercase tracking-wide text-slate-400 font-bold mb-1">${item.name}</div>
+              <div class="text-sm font-bold text-navy">Expected: ${item.expected}</div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button type="button" data-index="${index}" class="qty-btn qty-decrease w-10 h-10 rounded-xl border border-slate-200 bg-slate-100 text-slate-700 font-bold hover:bg-slate-200">-</button>
+              <div class="w-14 text-center font-bold text-navy text-lg">${item.returned}</div>
+              <button type="button" data-index="${index}" class="qty-btn qty-increase w-10 h-10 rounded-xl border border-slate-200 bg-teal text-white font-bold hover:bg-teal/90">+</button>
+            </div>
+          </div>
+          <div class="mt-4 grid gap-3 sm:grid-cols-2 items-end">
+            <div>
+              <label class="block text-xs uppercase tracking-wide text-slate-400 font-bold mb-1">Reason</label>
+              <select data-index="${index}" class="reason-select w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-teal focus:border-teal transition-shadow">
+                ${reasonOptions.map(reason => `<option value="${reason.value}" ${reason.value === item.reason ? 'selected' : ''}>${reason.label}</option>`).join('')}
+              </select>
+            </div>
+            <div class="rounded-2xl bg-slate-50 border border-slate-200 p-4 text-sm text-slate-600">
+              <div class="uppercase tracking-wide text-[10px] font-bold text-slate-400 mb-1">Balance</div>
+              <div class="font-bold text-navy">${item.expected - item.returned}</div>
+            </div>
+          </div>
+        `;
+
+        itemsContainer.appendChild(card);
+      });
+
+      itemsContainer.querySelectorAll('.qty-decrease').forEach(btn => {
+        btn.addEventListener('click', () => changeQty(Number(btn.dataset.index), -1));
+      });
+      itemsContainer.querySelectorAll('.qty-increase').forEach(btn => {
+        btn.addEventListener('click', () => changeQty(Number(btn.dataset.index), 1));
+      });
+      itemsContainer.querySelectorAll('.reason-select').forEach(select => {
+        select.addEventListener('change', () => {
+          const idx = Number(select.dataset.index);
+          returnItems[idx].reason = select.value;
+          saveDraft();
+          updateSummary();
+        });
+      });
+    }
+
+    function changeQty(index, delta) {
+      const item = returnItems[index];
+      if (!item) return;
+      item.returned = Math.max(0, Math.min(item.expected, item.returned + delta));
+      if (item.returned === 0) {
+        item.reason = '';
+      }
+      renderItems();
+      saveDraft();
+      updateSummary();
+    }
+
+    function updateSummary() {
+      const expected = returnItems.reduce((sum, item) => sum + item.expected, 0);
+      const returned = returnItems.reduce((sum, item) => sum + item.returned, 0);
+      const balance = expected - returned;
+
+      document.getElementById('summaryExpected').textContent = expected;
+      document.getElementById('summaryReturned').textContent = returned;
+      document.getElementById('summaryBalance').textContent = balance;
+
+      const submitBtn = document.getElementById('submitBtn');
+      const isValid = returned > 0 && returnItems.every(item => item.returned <= item.expected && (item.returned === 0 || item.reason));
+
+      if (isValid) {
+        submitBtn.disabled = false;
+        submitBtn.className = 'w-full sm:w-2/3 bg-teal hover:bg-teal/90 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-sm';
+      } else {
+        submitBtn.disabled = true;
+        submitBtn.className = 'w-full sm:w-2/3 bg-slate-300 text-slate-500 font-bold py-3 px-4 rounded-xl transition-all shadow-sm cursor-not-allowed';
+      }
+    }
+
+    function saveDraft() {
+      if (!activeOrder) return;
+      localStorage.setItem('returnOrderDraft', JSON.stringify({
+        orderId: activeOrder.id,
+        items: returnItems.map(item => ({ returned: item.returned, reason: item.reason }))
+      }));
+    }
+
+    function submitReturn() {
+      if (!activeOrder) return;
+      const expected = returnItems.reduce((sum, item) => sum + item.expected, 0);
+      const returned = returnItems.reduce((sum, item) => sum + item.returned, 0);
+      if (returned === 0 || returned > expected) return;
+
+      localStorage.removeItem('returnOrderDraft');
+      document.getElementById('xferSelect').value = '';
+      activeOrder = null;
+      returnItems = [];
+      document.getElementById('orderDetails').classList.add('hidden');
+      updateSummary();
+    }
+  </script>
+</body>
+</html>

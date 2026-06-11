@@ -1,0 +1,409 @@
+﻿<!doctype html>
+<html lang="en" class="h-full antialiased">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SDRS - Outlet Box Check</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .card-shadow { box-shadow: 0 24px 60px rgba(15, 35, 65, 0.08); }
+    .btn-transition { transition: background-color 0.25s ease, transform 0.25s ease; }
+    .section-card { border-radius: 1.75rem; }
+    .status-badge { transition: background-color 0.25s ease, color 0.25s ease; }
+    .receipt-panel { transition: border-color 0.25s ease, background-color 0.25s ease, color 0.25s ease; }
+    .disabled-cursor { cursor: not-allowed; }
+  </style>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: '#0F2341',
+            sky: {
+              600: '#0ea5e9',
+              700: '#0284c7'
+            },
+            orange: {
+              100: '#ffedd5',
+              300: '#fdba74',
+              700: '#c2410c'
+            },
+            purple: {
+              100: '#ede9fe',
+              300: '#c4b5fd',
+              700: '#6d28d9'
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-900">
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+    <div class="max-w-3xl mx-auto px-4 h-16 flex items-center gap-3">
+      <a href="index.html" class="text-slate-400 hover:text-slate-900 transition-colors">
+        <i data-lucide="arrow-left" class="w-5 h-5"></i>
+      </a>
+      <div class="w-11 h-11 bg-sky-600 text-white rounded-3xl flex items-center justify-center shadow-sm">
+        <i data-lucide="box" class="w-5 h-5"></i>
+      </div>
+      <div>
+        <h1 class="text-lg font-extrabold tracking-tight text-slate-950">Outlet Box Check</h1>
+        <p class="text-[10px] uppercase font-bold tracking-[0.35em] text-sky-600 mt-1">Verify incoming transfer</p>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-3xl mx-auto px-4 py-6">
+    <section class="bg-white border border-slate-200 section-card card-shadow overflow-hidden">
+      <div class="px-6 py-6 border-b border-slate-200">
+        <p class="text-xs uppercase tracking-[0.35em] font-bold text-slate-500">Order</p>
+        <h2 id="orderTitle" class="text-3xl font-extrabold text-slate-950 mt-1">Loading transfer...</h2>
+        <p class="mt-2 text-sm text-slate-500">Use the blue check buttons to confirm items one by one.</p>
+      </div>
+      <div class="p-6">
+        <form id="verifyForm" onsubmit="completeOrder(event)" class="space-y-5">
+          <div id="itemsContainer" class="space-y-4"></div>
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <a href="index.html" class="inline-flex items-center justify-center rounded-3xl border border-slate-200 bg-white px-6 py-4 text-sm font-bold text-slate-900 hover:bg-slate-50 transition">Cancel</a>
+            <button type="submit" id="submitBtn" disabled class="inline-flex w-full sm:w-auto items-center justify-center rounded-3xl bg-slate-300 px-6 py-4 text-sm font-bold text-slate-500 cursor-not-allowed btn-transition shadow-lg">
+              <i data-lucide="check-circle" class="w-4 h-4 mr-2"></i>
+              Complete Order
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <div id="toastContainer" class="fixed bottom-6 right-6 z-50"></div>
+
+  <script src="../shared/state.js"></script>
+  <script>
+    lucide.createIcons();
+
+    let currentOrder = null;
+
+    function showToast(message) {
+      const toast = document.createElement('div');
+      toast.className = 'rounded-3xl bg-slate-950 text-white px-5 py-3 shadow-2xl';
+      toast.textContent = message;
+      document.getElementById('toastContainer').appendChild(toast);
+      setTimeout(() => toast.remove(), 3200);
+    }
+
+    function getProgressKey(orderId) {
+      return `sdrs_outlet_progress_${orderId}`;
+    }
+
+    function loadProgress() {
+      if (!currentOrder?.id) return [];
+      try {
+        return JSON.parse(sessionStorage.getItem(getProgressKey(currentOrder.id)) || '[]');
+      } catch {
+        return [];
+      }
+    }
+
+    function saveProgress() {
+      if (!currentOrder?.id) return;
+      const state = Array.from(document.querySelectorAll('#itemsContainer > .item-card')).map((card, idx) => ({
+        itemIndex: idx,
+        confirmed: card.dataset.confirmed === 'true',
+        receivedQty: parseInt(card.querySelector('select.qty-select')?.value || '0', 10),
+        remark: card.querySelector('.item-remark')?.value.trim() || ''
+      }));
+      sessionStorage.setItem(getProgressKey(currentOrder.id), JSON.stringify(state));
+    }
+
+    function toItemName(item, idx) {
+      if (typeof item === 'string') return item;
+      return item.name || item.xferNumber || item.xferNo || item.sku || `Item ${idx + 1}`;
+    }
+
+    function toQty(item) {
+      return parseInt(item.qty || item.expectedQty || item.totalBoxes || item.boxes || 1, 10) || 1;
+    }
+
+    function buildItemCard(item, idx, savedState = {}) {
+      const itemName = toItemName(item, idx);
+      const expectedQty = toQty(item);
+      const savedReceivedQty = savedState.receivedQty != null ? parseInt(savedState.receivedQty, 10) : expectedQty;
+      const receivedQty = Number.isNaN(savedReceivedQty) ? expectedQty : savedReceivedQty;
+      const confirmed = savedState.confirmed === true && receivedQty === expectedQty;
+      const statusClass = confirmed ? 'bg-purple-100 border-purple-300 text-purple-700' : 'bg-orange-100 border-orange-300 text-orange-700';
+      const receivedLabelClass = confirmed ? 'text-purple-700' : 'text-orange-700';
+      const receivedBoxClass = confirmed ? 'border-purple-300 bg-purple-50' : 'border-orange-300 bg-orange-50';
+      const inputDisabled = confirmed ? 'disabled' : '';
+
+      const options = Array.from({ length: Math.max(expectedQty, 10) }, (_, q) => {
+        const value = q + 1;
+        return `<option value="${value}" ${value === receivedQty ? 'selected' : ''}>${value}</option>`;
+      }).join('');
+
+      return `
+        <div class="item-card rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm" data-confirmed="${confirmed ? 'true' : 'false'}" data-index="${idx}">
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div class="space-y-2">
+              <div class="text-xs uppercase tracking-[0.35em] text-slate-400 font-bold">Item ${idx + 1}</div>
+              <div class="text-lg font-bold text-slate-950">${itemName}</div>
+            </div>
+            <span class="status-badge inline-flex items-center rounded-full border px-3 py-2 text-[11px] font-bold uppercase tracking-[0.3em] ${statusClass}">${confirmed ? 'CONFIRMED' : 'PENDING'}</span>
+          </div>
+
+          <div class="mt-5 grid gap-4 lg:grid-cols-[1fr_auto] items-start">
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div class="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                <div class="text-[10px] uppercase tracking-[0.35em] text-slate-500 mb-2">Expected Qty</div>
+                <div class="text-2xl font-extrabold text-slate-950">${expectedQty}</div>
+              </div>
+              <div class="receipt-panel rounded-3xl border ${receivedBoxClass} p-4">
+                <div class="received-label text-[10px] uppercase tracking-[0.35em] font-bold ${receivedLabelClass} mb-2">Received Qty</div>
+                <select onchange="selectQty(this)" ${inputDisabled} class="qty-select w-full rounded-3xl border ${receivedBoxClass} bg-white px-4 py-3 text-sm font-semibold ${receivedLabelClass} outline-none focus:ring-2 ${confirmed ? 'focus:ring-purple-300' : 'focus:ring-orange-300'}">
+                  ${options}
+                </select>
+              </div>
+            </div>
+            <button type="button" onclick="toggleConfirm(this)" title="${confirmed ? 'Confirmed' : 'Confirm this item'}" class="confirm-btn inline-flex h-14 w-14 items-center justify-center rounded-[1.5rem] bg-sky-600 text-white shadow-lg hover:bg-sky-700 btn-transition">
+              <i data-lucide="check" class="w-5 h-5"></i>
+            </button>
+          </div>
+
+          <div class="mt-5">
+            <label class="text-[10px] uppercase tracking-[0.35em] text-slate-500 font-bold">Remarks</label>
+            <textarea ${inputDisabled} class="item-remark mt-2 w-full rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-900 outline-none" rows="3" placeholder="Optional notes, damage, missing items">${savedState.remark || ''}</textarea>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderItems() {
+      const container = document.getElementById('itemsContainer');
+      const savedState = loadProgress();
+      container.innerHTML = '';
+
+      currentOrder.items.forEach((item, idx) => {
+        const itemState = savedState.find(state => state.itemIndex === idx) || {};
+        container.insertAdjacentHTML('beforeend', buildItemCard(item, idx, itemState));
+      });
+
+      lucide.createIcons();
+      updateSubmitState();
+    }
+
+    function selectQty(select) {
+      const card = select.closest('[data-confirmed]');
+      if (!card) return;
+      if (card.dataset.confirmed === 'true') return;
+      saveProgress();
+      updateSubmitState();
+    }
+
+    function toggleConfirm(button) {
+      const card = button.closest('[data-confirmed]');
+      if (!card) return;
+      if (card.dataset.confirmed === 'true') {
+        resetCard(card);
+      } else {
+        confirmCard(card);
+      }
+      saveProgress();
+      updateSubmitState();
+    }
+
+    function confirmCard(card) {
+      const expectedQty = parseInt(card.querySelector('.text-2xl')?.textContent || '0', 10);
+      const select = card.querySelector('select.qty-select');
+      const receivedQty = parseInt(select?.value || '0', 10);
+      if (receivedQty !== expectedQty) {
+        showToast('Qty must match expected before confirming.');
+        return;
+      }
+      card.dataset.confirmed = 'true';
+      card.querySelector('.status-badge').className = 'status-badge inline-flex items-center rounded-full border border-purple-300 bg-purple-100 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.3em] text-purple-700';
+      card.querySelector('.status-badge').textContent = 'CONFIRMED';
+      const receivedPanel = card.querySelector('.receipt-panel');
+      receivedPanel.className = 'receipt-panel rounded-3xl border border-purple-300 bg-purple-50 p-4';
+      card.querySelector('.received-label').className = 'received-label text-[10px] uppercase tracking-[0.35em] font-bold text-purple-700 mb-2';
+      select.disabled = true;
+      card.querySelector('.item-remark').disabled = false;
+      lucide.createIcons();
+    }
+
+    function resetCard(card) {
+      card.dataset.confirmed = 'false';
+      card.querySelector('.status-badge').className = 'status-badge inline-flex items-center rounded-full border border-orange-300 bg-orange-100 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.3em] text-orange-700';
+      card.querySelector('.status-badge').textContent = 'PENDING';
+      const receivedPanel = card.querySelector('.receipt-panel');
+      receivedPanel.className = 'receipt-panel rounded-3xl border border-orange-300 bg-orange-50 p-4';
+      card.querySelector('.received-label').className = 'received-label text-[10px] uppercase tracking-[0.35em] font-bold text-orange-700 mb-2';
+      const select = card.querySelector('select.qty-select');
+      select.disabled = false;
+      card.querySelector('.item-remark').disabled = false;
+      lucide.createIcons();
+    }
+
+    function updateSubmitState() {
+      const cards = Array.from(document.querySelectorAll('#itemsContainer > .item-card'));
+      const submitBtn = document.getElementById('submitBtn');
+      const allConfirmed = cards.length > 0 && cards.every(card => card.dataset.confirmed === 'true');
+      if (allConfirmed) {
+        submitBtn.disabled = false;
+        submitBtn.className = 'inline-flex w-full sm:w-auto items-center justify-center rounded-3xl bg-sky-600 px-6 py-4 text-sm font-bold text-white hover:bg-sky-700 btn-transition shadow-lg';
+      } else {
+        submitBtn.disabled = true;
+        submitBtn.className = 'inline-flex w-full sm:w-auto items-center justify-center rounded-3xl bg-slate-300 px-6 py-4 text-sm font-bold text-slate-500 cursor-not-allowed btn-transition shadow-lg disabled-cursor';
+      }
+    }
+
+    function completeOrder(e) {
+      e.preventDefault();
+      const cards = Array.from(document.querySelectorAll('#itemsContainer > .item-card'));
+      const confirmedCards = cards.filter(card => card.dataset.confirmed === 'true');
+      if (confirmedCards.length !== cards.length) {
+        showToast('Confirm all items before completing.');
+        return;
+      }
+
+      const verifiedItems = confirmedCards.map((card, index) => ({
+        name: card.querySelector('div.text-lg')?.textContent || `Item ${index + 1}`,
+        expectedQty: parseInt(card.querySelector('.text-2xl')?.textContent || '0', 10),
+        receivedQty: parseInt(card.querySelector('select.qty-select')?.value || '0', 10),
+        remark: card.querySelector('.item-remark')?.value.trim() || ''
+      }));
+
+      const complaints = JSON.parse(localStorage.getItem('sdrs_complaints') || '[]');
+      verifiedItems.forEach(item => {
+        if (item.remark) {
+          complaints.push({
+            orderId: currentOrder.id,
+            outletId: currentOrder.outletId || '',
+            xfer: item.name,
+            remark: item.remark,
+            time: Date.now(),
+            status: 'NEW'
+          });
+        }
+      });
+      localStorage.setItem('sdrs_complaints', JSON.stringify(complaints));
+
+      currentOrder.status = 'COMPLETED';
+      currentOrder.receivedAt = new Date().toISOString();
+      currentOrder.receivedItems = verifiedItems;
+      currentOrder.hasIssue = verifiedItems.some(item => item.remark !== '');
+
+      const orders = JSON.parse(localStorage.getItem('sdrs_main_orders') || '[]');
+      const orderIndex = orders.findIndex(o => String(o.id) === String(currentOrder.id));
+      if (orderIndex !== -1) {
+        orders[orderIndex] = currentOrder;
+        localStorage.setItem('sdrs_main_orders', JSON.stringify(orders));
+        window.dispatchEvent(new Event('local_state_updated'));
+        window.dispatchEvent(new Event('state_sync'));
+      }
+
+      localStorage.setItem('sdrs_last_completed_order', JSON.stringify({
+        id: currentOrder.id,
+        outletId: currentOrder.outletId,
+        outletName: currentOrder.outletName || currentOrder.outlet || 'Unknown Outlet',
+        receivedAt: currentOrder.receivedAt,
+        receivedItems: verifiedItems,
+        hasIssue: currentOrder.hasIssue
+      }));
+
+      appendOutletHistory(currentOrder);
+      sessionStorage.removeItem(getProgressKey(currentOrder.id));
+      const submitBtn = document.getElementById('submitBtn');
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i data-lucide="loader" class="animate-spin w-4 h-4 mr-2"></i> Saving...';
+      lucide.createIcons();
+      setTimeout(() => window.location.href = `outlet-done.html?id=${encodeURIComponent(currentOrder.id)}`, 600);
+    }
+
+    function appendOutletHistory(order) {
+      if (!order) return;
+      const outletId = order.outletId || order.outlet || order.destination || order.outletName || order.branchName;
+      if (!outletId) return;
+      const orderKey = String(order.id || order.orderId || order.transferId || order.dispatchId || '').trim();
+      if (!orderKey) return;
+      const historyKey = 'outletHistory';
+      let historyData = [];
+      try {
+        historyData = JSON.parse(localStorage.getItem(historyKey) || '[]');
+        if (!Array.isArray(historyData)) historyData = [];
+      } catch (error) {
+        historyData = [];
+      }
+      
+      // Remove any existing entry with same orderId to avoid duplicates
+      historyData = historyData.filter(
+        record => String(record.orderId || record.id || '').trim() !== orderKey
+      );
+      
+      const entry = {
+        orderId: orderKey,
+        outletId: outletId,
+        outletName: order.outletName || order.outlet || order.destination || order.branchName || 'Unknown Outlet',
+        completedAt: order.receivedAt || new Date().toISOString(),
+        xferNumbers: (order.receivedItems || []).map(item => item.name || item.xfer || 'Unknown XFER'),
+        receivedItems: order.receivedItems || [],
+        hasIssue: !!order.hasIssue
+      };
+      
+      historyData.push(entry);
+      localStorage.setItem(historyKey, JSON.stringify(historyData));
+      
+      // Also sync to window.sdrsState
+      if (window.sdrsState) {
+        window.sdrsState.outletHistory = historyData;
+      }
+    }
+
+    function normalizeOrder(rawOrder) {
+      if (!rawOrder) return null;
+      rawOrder.id = rawOrder.id || rawOrder.orderId || rawOrder.transferId || rawOrder.dispatchId;
+      rawOrder.outletName = rawOrder.outletName || rawOrder.destination || rawOrder.outlet || rawOrder.branchName;
+      rawOrder.items = rawOrder.items || rawOrder.payload || rawOrder.xferItems || rawOrder.itemList || [];
+      if (!rawOrder.items.length && Array.isArray(rawOrder.xfers)) {
+        rawOrder.items = rawOrder.xfers.map(x => ({ name: x.xferNumber || x.xferNo || x.sku || x.name || 'XFER', qty: x.totalBoxes || x.expectedQty || x.qty || x.boxes || 1 }));
+      }
+      return rawOrder;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const selectedId = new URLSearchParams(window.location.search).get('id');
+      if (!selectedId) {
+        document.getElementById('orderTitle').textContent = 'No order selected';
+        return;
+      }
+
+      if (typeof migrateOrderStorage === 'function') migrateOrderStorage();
+
+      let orders = [];
+      const keys = ['sdrs_main_orders', 'sdrs_orders', 'orders', 'delivery_orders', 'outlet_orders'];
+      keys.forEach(key => {
+        try {
+          const data = JSON.parse(localStorage.getItem(key) || '[]');
+          if (Array.isArray(data)) orders = orders.concat(data);
+        } catch (err) {
+          console.warn('Unable to parse', key, err);
+        }
+      });
+
+      currentOrder = orders.find(o => String(o.id) === selectedId || String(o.orderId) === selectedId || String(o.transferId) === selectedId || String(o.dispatchId) === selectedId);
+      if (!currentOrder) {
+        document.getElementById('orderTitle').textContent = 'Order not found';
+        return;
+      }
+
+      currentOrder = normalizeOrder(currentOrder);
+      document.getElementById('orderTitle').textContent = currentOrder.id;
+      renderItems();
+      document.getElementById('verifyForm').addEventListener('submit', completeOrder);
+    });
+  </script>
+</body>
+</html>

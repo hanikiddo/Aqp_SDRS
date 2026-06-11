@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en" class="h-full antialiased">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SDRS - Box Checking</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .card-shadow { box-shadow: 0 4px 20px rgba(15, 35, 65, 0.08); }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-up { animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  </style>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: '#0F2341',
+            teal: '#2BA5B5',
+            'teal-light': '#E8F6F8',
+            corporate: { 50: '#f8fafc', 100: '#f1f5f9', 800: '#1e293b', 900: '#0f172a' }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-corporate-50 min-h-screen flex flex-col text-slate-800 pb-10">
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+    <div class="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <a href="index.html" class="text-slate-400 hover:text-navy transition-colors">
+            <i data-lucide="arrow-left" style="width:20px;height:20px;"></i>
+        </a>
+        <div class="w-8 h-8 bg-teal-500 text-white rounded-lg flex items-center justify-center shadow-sm">
+          <i data-lucide="box" style="width:18px;height:18px;"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-extrabold text-navy tracking-tight leading-none">Box Checking</h1>
+          <p class="text-[10px] uppercase font-bold text-teal-500 tracking-widest leading-none mt-1">Verify XFER before delivery</p>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-3xl w-full mx-auto p-4 flex flex-col fade-up mt-4">
+    <div class="bg-white border border-slate-200 rounded-3xl overflow-hidden card-shadow">
+      <div class="bg-slate-50 border-b border-slate-200 p-5">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="flex items-start gap-4">
+            <div class="w-12 h-12 bg-green-100 text-green-600 rounded-lg flex items-center justify-center shadow-sm flex-shrink-0">
+              <i data-lucide="map-pin" style="width:24px;height:24px;"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="text-xs uppercase tracking-widest text-slate-400 font-bold mb-2">Outlet ID</div>
+              <div id="transferId" class="text-2xl font-extrabold text-navy break-words">Loading...</div>
+            </div>
+          </div>
+          <div class="flex flex-col justify-center">
+            <div class="text-xs uppercase tracking-widest text-slate-400 font-bold mb-2">Outlet Name</div>
+            <div id="outletName" class="text-lg font-bold text-slate-700 mb-3">-</div>
+            <div class="text-xs uppercase tracking-widest text-slate-400 font-bold mb-1">Transfer Date</div>
+            <div id="transferDate" class="text-sm text-slate-600">-</div>
+          </div>
+        </div>
+      </div>
+      <div class="p-5 space-y-4">
+        <div class="bg-cyan-50 border border-cyan-200 rounded-xl p-4">
+          <div class="text-xs font-bold text-cyan-700 uppercase tracking-widest mb-3 flex items-center gap-2">
+            <i data-lucide="box" style="width:18px;height:18px;"></i>
+            XFER Numbers to Verify
+          </div>
+          <div id="xferSummary" class="space-y-2 text-sm">
+            <!-- XFER numbers summary will be injected here -->
+          </div>
+        </div>
+        <div id="itemsContainer" class="space-y-4">
+          <div class="text-sm font-bold text-slate-700 uppercase tracking-widest bg-white px-4 py-2 rounded-lg border border-slate-200">Verify Each Box</div>
+        </div>
+        <div class="pt-4 border-t border-slate-100 flex flex-col sm:flex-row gap-3">
+          <a href="index.html" class="w-full sm:w-1/3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-bold py-3.5 rounded-2xl transition-all shadow-sm text-center">Cancel</a>
+          <button id="approveBtn" disabled class="w-full sm:w-2/3 bg-slate-300 text-slate-500 font-bold py-3.5 rounded-2xl transition-all shadow-md cursor-not-allowed">Approve</button>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <script src="../shared/state.js"></script>
+  <script>
+    lucide.createIcons();
+    let currentTask = null;
+
+    function formatLocalDate(value) {
+      if (!value) return '-';
+      const date = new Date(value);
+      return date.toLocaleString('en-MY', { timeZone: 'Asia/Kuala_Lumpur', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+
+    function renderItems() {
+      const container = document.getElementById('itemsContainer');
+      const summaryContainer = document.getElementById('xferSummary');
+      
+      if (!currentTask) return;
+
+      // Clear previous items but keep the header
+      const items = container.querySelectorAll('[data-index]');
+      items.forEach(item => item.remove());
+      
+      summaryContainer.innerHTML = '';
+
+      // Render XFER summary at the top
+      currentTask.items.forEach((item) => {
+        const summary = document.createElement('div');
+        summary.className = 'flex items-center justify-between p-3 bg-white border border-cyan-100 rounded-lg';
+        summary.innerHTML = `
+          <span class="font-semibold text-slate-700">${item.name}</span>
+          <span class="text-xs font-bold bg-cyan-100 text-cyan-700 px-3 py-1 rounded-full">${item.qty} box${item.qty > 1 ? 'es' : ''}</span>
+        `;
+        summaryContainer.appendChild(summary);
+      });
+
+      currentTask.items.forEach((item, index) => {
+        const itemBlock = document.createElement('div');
+        itemBlock.className = 'bg-white border-l-4 border-l-cyan-500 border border-slate-200 rounded-3xl p-4';
+        itemBlock.dataset.index = index;
+        itemBlock.dataset.checked = 'false';
+        
+        let numberButtons = '';
+        for (let i = 1; i <= item.qty; i++) {
+          numberButtons += `<button type="button" data-box="${i}" onclick="toggleBoxCheck(this, ${index}, ${i})" class="box-btn w-10 h-10 rounded-xl border-2 border-red-300 bg-red-100 text-black font-bold text-sm hover:bg-red-200 hover:scale-105 transition-all">
+            ${i}
+          </button>`;
+        }
+
+        itemBlock.innerHTML = `
+          <div class="flex items-center justify-between gap-4 mb-4">
+            <div>
+              <div class="text-xs uppercase tracking-widest text-slate-400 font-bold mb-1">XFER Number</div>
+              <div class="text-lg font-bold text-slate-900">${item.name}</div>
+            </div>
+            <div class="text-right">
+              <div class="text-xs uppercase tracking-widest text-slate-400 font-bold mb-1">Expected Boxes</div>
+              <div class="text-lg font-extrabold text-navy">${item.qty}</div>
+            </div>
+          </div>
+          <div class="bg-cyan-50 rounded-2xl border border-cyan-200 p-4">
+            <div class="text-xs uppercase tracking-widest text-cyan-600 font-bold mb-3">Verify each box</div>
+            <div class="flex flex-wrap gap-2">
+              ${numberButtons}
+            </div>
+          </div>
+        `;
+        container.appendChild(itemBlock);
+      });
+
+      lucide.createIcons();
+      updateApproveButtonState();
+    }
+
+    function toggleBoxCheck(button, itemIndex, boxNumber) {
+      const itemBlock = document.getElementById('itemsContainer').querySelectorAll('[data-index]')[itemIndex];
+      const checkedState = button.dataset.checked === 'true';
+      
+      if (checkedState) {
+        button.dataset.checked = 'false';
+        button.className = 'box-btn w-10 h-10 rounded-xl border-2 border-red-300 bg-red-100 text-black font-bold text-sm hover:bg-red-200 hover:scale-105 transition-all';
+      } else {
+        button.dataset.checked = 'true';
+        button.className = 'box-btn w-10 h-10 rounded-xl border-2 border-green-400 bg-green-500 text-black font-bold text-sm hover:bg-green-600 hover:scale-105 transition-all';
+      }
+      
+      updateApproveButtonState();
+    }
+
+    function updateApproveButtonState() {
+      const approveBtn = document.getElementById('approveBtn');
+      const items = currentTask.items || [];
+      let allChecked = true;
+
+      items.forEach((item, itemIndex) => {
+        const itemBlock = document.getElementById('itemsContainer').querySelectorAll('[data-index]')[itemIndex];
+        if (!itemBlock) return;
+        
+        const buttons = itemBlock.querySelectorAll('.box-btn');
+        const checkedCount = Array.from(buttons).filter(btn => btn.dataset.checked === 'true').length;
+        
+        if (checkedCount !== item.qty) {
+          allChecked = false;
+        }
+      });
+
+      if (allChecked && items.length > 0) {
+        approveBtn.disabled = false;
+        approveBtn.className = 'w-full sm:w-2/3 text-white font-bold py-3.5 rounded-2xl transition-all shadow-md cursor-pointer';
+        approveBtn.style.background = 'linear-gradient(135deg, #22c55e, #16a34a)';
+        approveBtn.style.boxShadow = '0 4px 20px rgba(34, 197, 94, 0.3)';
+      } else {
+        approveBtn.disabled = true;
+        approveBtn.className = 'w-full sm:w-2/3 bg-slate-300 text-slate-500 font-bold py-3.5 rounded-2xl transition-all shadow-md cursor-not-allowed';
+      }
+    }
+
+    function approveTransfer() {
+      const approveBtn = document.getElementById('approveBtn');
+      if (approveBtn.disabled) {
+        return;
+      }
+
+      const checkedItems = currentTask.items.map((item, index) => {
+        const itemBlock = document.getElementById('itemsContainer').querySelectorAll('[data-index]')[index];
+        const buttons = itemBlock.querySelectorAll('.box-btn');
+        const checkedBoxes = Array.from(buttons)
+          .filter(btn => btn.dataset.checked === 'true')
+          .map(btn => parseInt(btn.dataset.box, 10));
+
+        return {
+          name: item.name,
+          qty: item.qty,
+          checkedBoxes,
+          allVerified: checkedBoxes.length === item.qty
+        };
+      });
+
+      const now = new Date();
+      const verifiedAt = now.toISOString();
+
+      currentTask.status = 'VERIFIED_BY_DRIVER';
+      currentTask.verifiedAt = verifiedAt;
+      currentTask.verifiedTimestamp = now.getTime();
+      currentTask.driverVerification = {
+        status: 'VERIFIED_BY_DRIVER',
+        verifiedAt,
+        verifiedTimestamp: now.getTime(),
+        items: checkedItems,
+        driverName: currentTask.driverName || 'Driver'
+      };
+
+      const outgoing = {
+        ...currentTask,
+        items: checkedItems,
+        status: 'VERIFIED_BY_DRIVER',
+        verifiedAt,
+        verifiedTimestamp: now.getTime(),
+        driverCheck: {
+          time: verifiedAt,
+          items: checkedItems,
+          status: 'VERIFIED_BY_DRIVER'
+        }
+      };
+
+      window.sdrsState.outletIncomingQueue = window.sdrsState.outletIncomingQueue || [];
+      window.sdrsState.outletIncomingQueue.push(outgoing);
+
+      window.sdrsState.driverQueue = (window.sdrsState.driverQueue || []).filter(task => task.id !== currentTask.id);
+      window.sdrsState.driverHistory = window.sdrsState.driverHistory || [];
+      window.sdrsState.driverHistory.unshift({
+        transferId: currentTask.id,
+        outletId: currentTask.outletId,
+        outletName: currentTask.outletName || currentTask.outlet,
+        date: verifiedAt,
+        status: 'VERIFIED_BY_DRIVER',
+        xferItems: checkedItems,
+        totalBoxes: checkedItems.reduce((sum, item) => sum + (parseInt(item.qty || item.totalBoxes, 10) || 0), 0)
+      });
+
+      const warehouseOrder = (window.sdrsState.warehouseTransfers || []).find(order => order.id === currentTask.id);
+      if (warehouseOrder) {
+        warehouseOrder.status = 'VERIFIED_BY_DRIVER';
+        warehouseOrder.verifiedAt = verifiedAt;
+        warehouseOrder.verifiedTimestamp = now.getTime();
+        warehouseOrder.driverVerification = currentTask.driverVerification;
+      }
+
+      window.sdrsState.warehouse_xfer_data = window.sdrsState.warehouseTransfers;
+      window.sdrsState.driver_tasks = window.sdrsState.driverQueue;
+      window.sdrsState.driver_history = window.sdrsState.driverHistory;
+      window.sdrsState.outlet_incoming = window.sdrsState.outletIncomingQueue;
+
+      if (typeof persistState === 'function') {
+        persistState();
+        console.log('Driver sent verified transfer to outlet queue', outgoing);
+      }
+
+      window.location.href = 'index.html';
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const params = new URLSearchParams(window.location.search);
+      const taskId = params.get('id');
+      
+      if (!taskId) {
+        window.location.href = 'index.html';
+        return;
+      }
+
+      // Ensure state is loaded
+      if (typeof loadAllStateFromStorage === 'function') {
+        loadAllStateFromStorage();
+      }
+
+      currentTask = (window.sdrsState.warehouseTransfers || []).find(task => task.id === taskId);
+      
+      if (!currentTask) {
+        // Debug: Log available tasks
+        console.error('Transfer not found. Available warehouse transfers:', window.sdrsState.warehouseTransfers, 'Looking for ID:', taskId);
+        window.location.href = 'index.html';
+        return;
+      }
+
+      // Display the task information with fallbacks
+      const outletId = currentTask.outletId || 'Unknown';
+      const outletName = currentTask.outlet || 'Unknown Outlet';
+      const createdAt = currentTask.createdAt || new Date().toISOString();
+      
+      document.getElementById('transferId').textContent = outletId;
+      document.getElementById('outletName').textContent = outletName;
+      document.getElementById('transferDate').textContent = formatLocalDate(createdAt);
+      
+      // Verify items exist
+      if (!currentTask.items || currentTask.items.length === 0) {
+        console.warn('No items found for this transfer');
+        window.location.href = 'index.html';
+        return;
+      }
+      
+      renderItems();
+
+      document.getElementById('approveBtn').addEventListener('click', approveTransfer);
+    });
+  </script>
+</body>
+</html>

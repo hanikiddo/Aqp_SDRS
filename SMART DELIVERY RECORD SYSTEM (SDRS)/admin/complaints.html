@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en" class="h-full">
+ <head>
+  <script src="../services/app.js"></script>
+  <script>
+    if (!window.SDRS?.Auth?.requireRole('admin', '../login.html')) {
+      // Redirect handled by session guard.
+    }
+  </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SDRS - Complaints Management</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .card-shadow { box-shadow: 0 4px 16px rgba(15, 35, 65, 0.08); }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-up { animation: fadeUp 0.6s ease-out both; }
+  </style>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: '#0F2341',
+            teal: '#2BA5B5',
+            'teal-light': '#E8F6F8',
+          }
+        }
+      }
+    }
+  </script>
+ </head>
+ <body class="h-full bg-slate-50 flex flex-col">
+
+   <header class="bg-white border-b border-slate-200 sticky top-0 z-50">
+    <div class="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <a href="index.html" class="text-slate-400 hover:text-navy transition-colors">
+            <i data-lucide="arrow-left" style="width:20px;height:20px;"></i>
+        </a>
+        <div class="w-10 h-10 bg-red-100 text-red-600 rounded-lg flex items-center justify-center shadow-sm border border-red-200">
+          <i data-lucide="alert-triangle" style="width:20px;height:20px;"></i>
+        </div>
+        <div>
+          <h1 class="text-xl font-extrabold text-navy tracking-tight leading-none">Complaints Management</h1>
+          <p class="text-[10px] uppercase font-bold text-red-600 tracking-widest leading-none mt-1">Issue Resolution</p>
+        </div>
+      </div>
+      <button onclick="handleLogout()" class="flex items-center gap-2 text-slate-500 hover:text-red-600 px-3 py-2 rounded-xl text-sm font-bold hover:bg-red-50 transition-colors">
+          <i data-lucide="log-out" style="width:16px;height:16px;"></i> Logout
+      </button>
+    </div>
+  </header>
+
+  <div class="w-full flex-1 overflow-auto p-6 fade-up">
+    <div class="max-w-4xl mx-auto bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div class="p-5 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+            <h2 class="font-bold text-navy text-lg">Reported Issues</h2>
+            <div id="statsCount" class="text-xs font-bold text-slate-500 bg-slate-200 px-2 py-1 rounded-md border border-slate-300">0 Total</div>
+        </div>
+        <div id="complaintsList" class="p-6 space-y-4 bg-slate-50/50">
+            <!-- Complaints injected here -->
+        </div>
+    </div>
+  </div>
+
+  <script src="../shared/state.js"></script>
+  <script>
+      function handleLogout() {
+          window.SDRS?.Auth?.logout();
+          window.location.href = '../index.html';
+      }
+
+      function formatTime(timestamp) {
+          if(!timestamp) return '--';
+          return new Date(timestamp).toLocaleString("en-MY", {
+             timeZone: "Asia/Kuala_Lumpur",
+             year: "numeric", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit"
+          });
+      }
+
+      const outletMap = {
+          IDOUT01: "Farmasi Al Qanaah Air Biru",
+          IDOUT02: "Scientex",
+          IDOUT03: "Kempas",
+          IDOUT04: "Taman Suria",
+          IDOUT05: "Sri Saujana",
+          IDOUT06: "Seri Alam",
+          IDOUT07: "Pulai Mutiara"
+      };
+
+      function loadComplaints() {
+          const manager = window.SDRSStateManager;
+          let complaints = manager ? manager.getState('complaints') : (JSON.parse(localStorage.getItem("sdrs_complaints")) || []);
+          const list = document.getElementById('complaintsList');
+          
+          // Deduplicate: keep only latest complaint per orderId + xfer combination
+          // Prioritize complaints that have responses
+          const seen = {};
+          const deduped = [];
+          
+          complaints.forEach((c) => {
+              const key = `${c.orderId || c.transferId || 'unknown'}_${c.xfer || c.transfer || 'general'}`;
+              if (!seen[key]) {
+                  seen[key] = c;
+                  deduped.push(c);
+              } else {
+                  // If new complaint has a response and current doesn't, replace
+                  if (c.response && !seen[key].response) {
+                      const idx = deduped.findIndex(comp => comp === seen[key]);
+                      if (idx !== -1) deduped[idx] = c;
+                      seen[key] = c;
+                  }
+                  // Otherwise keep the one with response, or newer if neither has response
+                  else if (!c.response && !seen[key].response && c.time > seen[key].time) {
+                      const idx = deduped.findIndex(comp => comp === seen[key]);
+                      if (idx !== -1) deduped[idx] = c;
+                      seen[key] = c;
+                  }
+              }
+          });
+          
+          // Update localStorage if duplicates were removed
+          if (deduped.length !== complaints.length) {
+              localStorage.setItem("sdrs_complaints", JSON.stringify(deduped));
+              complaints = deduped;
+          }
+          
+          if(complaints.length === 0) {
+              list.innerHTML = `<div class="text-center py-12 text-slate-400 font-medium text-sm flex flex-col items-center"><i data-lucide="check-circle-2" style="width:32px;height:32px;margin-bottom:10px" class="text-emerald-500 opacity-50"></i> All clear. No complaints recorded.</div>`;
+              document.getElementById('statsCount').textContent = '0 Total';
+              if(window.lucide) window.lucide.createIcons();
+              return;
+          }
+
+          let changed = false;
+          // As per rule 6: mark as READ when viewed
+          complaints.forEach(c => {
+              if (c.status === "NEW") {
+                  c.status = "READ";
+                  changed = true;
+              }
+          });
+          
+          if (changed) {
+              localStorage.setItem("sdrs_complaints", JSON.stringify(complaints));
+              // Notify other tabs/dashboard that complaints have been updated
+              window.dispatchEvent(new Event('local_state_updated'));
+          }
+
+          document.getElementById('statsCount').textContent = complaints.length + ' Total';
+          
+          list.innerHTML = '';
+          complaints.forEach((c) => {
+              const card = document.createElement('div');
+              card.className = "bg-white border border-slate-200 rounded-xl p-5 shadow-sm relative";
+              
+              let responseSection = '';
+              if (c.response) {
+                  responseSection = `
+                      <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                         <span class="text-[10px] text-blue-600 uppercase font-bold tracking-wider block mb-1 flex items-center gap-1"><i data-lucide="check-circle-2" style="width:12px;height:12px;"></i> Admin Response</span>
+                         <div class="text-sm text-navy font-semibold">${c.response}</div>
+                         <div class="text-[10px] text-slate-500 font-medium font-mono mt-1">By ${c.responseBy || 'Admin'} • ${formatTime(c.responseTime)}</div>
+                      </div>`;
+              } else {
+                  responseSection = `
+                      <div class="mt-4 flex gap-2">
+                          <input type="text" id="reply-${c.time}" placeholder="Type resolution response here..." class="flex-1 rounded-lg border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-sm bg-slate-50">
+                          <button onclick="submitResponse(${c.time})" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-bold transition-all shadow-sm">Reply</button>
+                      </div>
+                  `;
+              }
+
+              let statusClasses = 'text-slate-600 bg-slate-200 border-slate-300';
+              if(c.status === 'NEW' || c.status === 'READ') statusClasses = 'text-red-700 bg-red-100 border-red-200'; // Keep it red if not resolved
+              if(c.status === 'RESPONDED') statusClasses = 'text-blue-700 bg-blue-100 border-blue-200';
+
+              const outletName = outletMap[c.outletId] || "Unknown Outlet";
+              card.innerHTML = `
+                  <div class="flex items-start justify-between mb-2 gap-4">
+                      <div class="font-bold text-navy text-sm flex-1">
+                         <div class="flex flex-wrap items-center gap-2">
+                           <span class="bg-slate-100 px-2 py-1 rounded text-slate-600 font-mono tracking-wide text-xs border border-slate-200">${c.xfer || c.orderId}</span>
+                         </div>
+                         <div class="mt-2 text-slate-900 font-bold">${c.outletId}</div>
+                         <div class="text-xs text-slate-500">${outletName}</div>
+                      </div>
+                      <div class="text-[10px] font-bold uppercase tracking-wider ${statusClasses} border px-2 py-1 rounded-md shrink-0 flex items-center shadow-sm">${c.status === 'READ' ? 'PENDING REPLY' : c.status}</div>
+                  </div>
+                  <div class="text-sm text-slate-700 mb-2 font-medium mt-3 bg-red-50/50 p-3 rounded-lg border border-red-100">
+                      <span class="text-[10px] text-red-500 uppercase font-bold tracking-wider block mb-1">Reported Issue</span>
+                      ${c.remark}
+                  </div>
+                  <div class="text-[11px] text-slate-400 font-mono flex items-center gap-1"><i data-lucide="clock" style="width:12px;height:12px;"></i> ${formatTime(c.time)}</div>
+                  ${responseSection}
+              `;
+              list.appendChild(card);
+          });
+          if(window.lucide) window.lucide.createIcons();
+      }
+
+      function submitResponse(timeId) {
+          const complaints = JSON.parse(localStorage.getItem("sdrs_complaints")) || [];
+          const idx = complaints.findIndex(c => c.time === timeId);
+          if (idx !== -1) {
+              const input = document.getElementById('reply-' + timeId);
+              if (input && input.value.trim()) {
+                  complaints[idx].response = input.value.trim();
+                  complaints[idx].responseBy = 'Admin';
+                  complaints[idx].responseTime = Date.now();
+                  complaints[idx].status = "RESPONDED";
+                  if (window.SDRSStateManager) {
+                      window.SDRSStateManager.setState('complaints', complaints);
+                  } else {
+                      localStorage.setItem("sdrs_complaints", JSON.stringify(complaints));
+                  }
+                  // Notify other tabs/dashboard that complaints have been updated
+                  window.dispatchEvent(new Event('local_state_updated'));
+                  loadComplaints();
+              }
+          }
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+          loadComplaints();
+          lucide.createIcons();
+      });
+  </script>
+ </body>
+</html>
