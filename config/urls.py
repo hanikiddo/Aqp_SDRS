@@ -22,7 +22,7 @@ from django.views.static import serve
 
 from . import views
 
-FRONTEND_DIR = settings.BASE_DIR.parent.parent / 'SMART DELIVERY RECORD SYSTEM (SDRS)'
+FRONTEND_DIR = settings.BASE_DIR / 'SMART DELIVERY RECORD SYSTEM (SDRS)'
 
 urlpatterns = [
     path('django-admin/', admin.site.urls),
