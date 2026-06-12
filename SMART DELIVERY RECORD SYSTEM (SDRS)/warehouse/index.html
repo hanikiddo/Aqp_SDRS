@@ -332,10 +332,12 @@
         minute: '2-digit'
       });
 
-      const storedOutletId = String(localStorage.getItem('selectedOutletId') || selectedOutletId || '').trim();
-      const transferID = storedOutletId || (window.SDRSStateManager && typeof window.SDRSStateManager.generateTransferId === 'function'
-        ? window.SDRSStateManager.generateTransferId()
-        : `XFER-${now.getTime()}`);
+      const transferID = String(localStorage.getItem('selectedOutletId') || selectedOutletId || '').trim();
+
+      if (!transferID) {
+        showError('Sila pilih outlet terlebih dahulu sebelum menghasilkan transfer.');
+        return;
+      }
 
       const order = {
         id: transferID,

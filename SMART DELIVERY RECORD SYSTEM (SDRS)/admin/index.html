@@ -275,26 +275,28 @@
 
       function syncDashboardStats() {
           const orders = getOrders();
-          
-          const total = orders.length;
-          const driverPending = orders.filter(o => ['CREATED', 'PENDING_DRIVER', 'PENDING'].includes((o.status || '').toString().toUpperCase())).length;
-          const outletPending = orders.filter(o => ['VERIFIED_BY_DRIVER', 'VERIFIED BY DRIVER'].includes((o.status || '').toString().toUpperCase())).length;
-          const completed = orders.filter(o => o.status === 'COMPLETED').length;
-          const issues = orders.filter(o => o.hasIssue).length;
+          const stats = (window.SDRSStats && typeof window.SDRSStats.calculateDashboardStats === 'function')
+              ? window.SDRSStats.calculateDashboardStats(orders)
+              : {
+                  total: orders.length,
+                  driverPending: orders.filter((o) => ['CREATED', 'PENDING_DRIVER', 'PENDING'].includes(String(o.status || '').trim().replace(/\s+/g, '_').toUpperCase())).length,
+                  outletPending: orders.filter((o) => ['VERIFIED_BY_DRIVER', 'VERIFIED BY DRIVER', 'IN_TRANSIT', 'PENDING_OUTLET', 'ARRIVED'].includes(String(o.status || '').trim().replace(/\s+/g, '_').toUpperCase())).length,
+                  completed: orders.filter((o) => String(o.status || '').trim().replace(/\s+/g, '_').toUpperCase() === 'COMPLETED').length,
+                  issues: orders.filter((o) => Boolean(o.hasIssue) || ['REJECTED', 'MISMATCH', 'DISCREPANCY', 'ISSUE'].includes(String(o.status || '').trim().replace(/\s+/g, '_').toUpperCase())).length
+                };
 
-          document.getElementById('kpi-total').textContent = total;
-          document.getElementById('kpi-driver').textContent = driverPending;
-          document.getElementById('kpi-outlet').textContent = outletPending;
-          document.getElementById('kpi-complete').textContent = completed;
-          document.getElementById('kpi-issues').textContent = issues;
+          document.getElementById('kpi-total').textContent = stats.total || 0;
+          document.getElementById('kpi-driver').textContent = stats.driverPending || 0;
+          document.getElementById('kpi-outlet').textContent = stats.outletPending || 0;
+          document.getElementById('kpi-complete').textContent = stats.completed || 0;
+          document.getElementById('kpi-issues').textContent = stats.issues || 0;
 
-          // Store globally for cross-module access
           window.globalStats = {
-              total,
-              driverPending,
-              outletPending,
-              completed,
-              issues,
+              total: stats.total || 0,
+              driverPending: stats.driverPending || 0,
+              outletPending: stats.outletPending || 0,
+              completed: stats.completed || 0,
+              issues: stats.issues || 0,
               timestamp: Date.now()
           };
       }
@@ -391,10 +393,103 @@
 
       let currentDetailOrderId = null;
 
+      function safeParseJson(value, fallback = []) {
+          try {
+              const parsed = JSON.parse(value);
+              return Array.isArray(parsed) ? parsed : (parsed && typeof parsed === 'object' && Array.isArray(parsed.value) ? parsed.value : fallback);
+          } catch (error) {
+              return fallback;
+          }
+      }
+
+      function migrateOrderStorage() {
+          try {
+              const manager = window.SDRSStateManager;
+              const sourceKeys = ['warehouseTransfers', 'driverQueue', 'driverHistory', 'outletIncomingQueue', 'outletHistory', 'adminGlobalPipeline'];
+              const orderMap = new Map();
+
+              const addOrders = (items) => {
+                  const list = Array.isArray(items) ? items : [];
+                  list.forEach((item) => {
+                      if (!item || typeof item !== 'object') return;
+                      const transferId = String(item.transferId || item.id || item.orderId || '').trim();
+                      const recordKey = transferId || `item-${orderMap.size}-${Math.random().toString(36).slice(2)}`;
+                      if (orderMap.has(recordKey)) {
+                          orderMap.set(recordKey, { ...orderMap.get(recordKey), ...item, transferId: transferId || orderMap.get(recordKey).transferId || item.id || item.orderId });
+                      } else {
+                          orderMap.set(recordKey, { ...item, transferId: transferId || item.id || item.orderId });
+                      }
+                  });
+              };
+
+              if (manager && typeof manager.loadAllStateFromStorage === 'function') {
+                  const loaded = manager.loadAllStateFromStorage();
+                  sourceKeys.forEach((key) => addOrders(loaded[key] || []));
+              }
+
+              sourceKeys.forEach((key) => {
+                  addOrders(safeParseJson(localStorage.getItem(key), []));
+              });
+
+              const fallbackOrders = [
+                  ...safeParseJson(localStorage.getItem('sdrs_main_orders'), []),
+                  ...safeParseJson(localStorage.getItem('sdrs_records'), []),
+                  ...safeParseJson(localStorage.getItem('warehouse_xfer_data'), [])
+              ];
+              addOrders(fallbackOrders);
+
+              const mergedOrders = Array.from(orderMap.values());
+              if (manager && typeof manager.setState === 'function') {
+                  manager.setState('adminGlobalPipeline', mergedOrders);
+              }
+              localStorage.setItem('adminGlobalPipeline', JSON.stringify(mergedOrders));
+              localStorage.setItem('sdrs_main_orders', JSON.stringify(mergedOrders));
+              localStorage.setItem('sdrs_records', JSON.stringify(mergedOrders));
+              window.sdrsOrders = mergedOrders;
+              return mergedOrders;
+          } catch (error) {
+              console.error('Admin dashboard migration failed:', error);
+              return [];
+          }
+      }
+
       function getOrders() {
           try {
               const manager = window.SDRSStateManager;
-              return manager ? manager.getState('adminGlobalPipeline') : (JSON.parse(localStorage.getItem('adminGlobalPipeline') || '[]') || []);
+              const sourceKeys = ['adminGlobalPipeline', 'warehouseTransfers', 'driverQueue', 'driverHistory', 'outletIncomingQueue', 'outletHistory'];
+              const orderMap = new Map();
+
+              const addOrders = (items) => {
+                  const list = Array.isArray(items) ? items : [];
+                  list.forEach((item) => {
+                      if (!item || typeof item !== 'object') return;
+                      const id = String(item.transferId || item.id || item.orderId || item.outletId || '').trim();
+                      if (id) {
+                          if (!orderMap.has(id)) {
+                              orderMap.set(id, { ...item, transferId: item.transferId || item.id || item.orderId || item.outletId });
+                          } else {
+                              orderMap.set(id, { ...orderMap.get(id), ...item, transferId: item.transferId || orderMap.get(id).transferId || item.id || item.orderId || item.outletId });
+                          }
+                      } else {
+                          orderMap.set(`item-${orderMap.size}-${Math.random().toString(36).slice(2)}`, item);
+                      }
+                  });
+              };
+
+              if (manager && typeof manager.loadAllStateFromStorage === 'function') {
+                  const loaded = manager.loadAllStateFromStorage();
+                  sourceKeys.forEach((key) => addOrders(loaded[key] || []));
+              }
+
+              sourceKeys.forEach((key) => {
+                  addOrders(safeParseJson(localStorage.getItem(key), []));
+              });
+
+              ['sdrs_main_orders', 'sdrs_records', 'warehouse_xfer_data', 'sdrs_orders', 'orders'].forEach((key) => {
+                  addOrders(safeParseJson(localStorage.getItem(key), []));
+              });
+
+              return Array.from(orderMap.values());
           } catch (e) {
               console.error('Error parsing orders:', e);
               return [];

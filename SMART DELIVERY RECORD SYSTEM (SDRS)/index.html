@@ -222,6 +222,7 @@
 
   </main>
 
+  <script src="shared/state.js"></script>
   <script>
       lucide.createIcons();
 
@@ -350,23 +351,37 @@
 
       function syncDashboardStats() {
           console.debug('[SDRS] syncDashboardStats start');
-          const orders = SDRSStorageManager.getAllOrders();
-          const total = orders.length;
-          const driverPending = orders.filter(o => ['CREATED', 'PENDING_DRIVER', 'PENDING'].includes(normalizeStatus(o.status))).length;
-          const outletPending = orders.filter(o => ['VERIFIED_BY_DRIVER'].includes(normalizeStatus(o.status))).length;
-          const completed = orders.filter(o => normalizeStatus(o.status) === 'COMPLETED').length;
+          const orders = (window.SDRSStats && typeof window.SDRSStats.collectDashboardOrders === 'function')
+              ? window.SDRSStats.collectDashboardOrders()
+              : SDRSStorageManager.getAllOrders();
+          const stats = (window.SDRSStats && typeof window.SDRSStats.calculateDashboardStats === 'function')
+              ? window.SDRSStats.calculateDashboardStats(orders)
+              : {
+                  total: orders.length,
+                  driverPending: orders.filter((o) => ['CREATED', 'PENDING_DRIVER', 'PENDING'].includes(normalizeStatus(o.status))).length,
+                  outletPending: orders.filter((o) => ['VERIFIED_BY_DRIVER', 'VERIFIED BY DRIVER', 'IN_TRANSIT', 'PENDING_OUTLET', 'ARRIVED'].includes(normalizeStatus(o.status))).length,
+                  completed: orders.filter((o) => normalizeStatus(o.status) === 'COMPLETED').length,
+                  issues: orders.filter((o) => Boolean(o.hasIssue) || ['REJECTED', 'MISMATCH', 'DISCREPANCY', 'ISSUE'].includes(normalizeStatus(o.status))).length
+                };
 
           const totalEl = document.getElementById('stat-total');
           const driverPendingEl = document.getElementById('stat-driver-pending');
           const outletPendingEl = document.getElementById('stat-outlet-pending');
           const completedEl = document.getElementById('stat-completed');
 
-          if (totalEl) totalEl.textContent = String(total);
-          if (driverPendingEl) driverPendingEl.textContent = String(driverPending);
-          if (outletPendingEl) outletPendingEl.textContent = String(outletPending);
-          if (completedEl) completedEl.textContent = String(completed);
+          if (totalEl) totalEl.textContent = String(stats.total || 0);
+          if (driverPendingEl) driverPendingEl.textContent = String(stats.driverPending || 0);
+          if (outletPendingEl) outletPendingEl.textContent = String(stats.outletPending || 0);
+          if (completedEl) completedEl.textContent = String(stats.completed || 0);
 
-          window.globalStats = { total, driverPending, outletPending, completed, timestamp: Date.now() };
+          window.globalStats = {
+              total: stats.total || 0,
+              driverPending: stats.driverPending || 0,
+              outletPending: stats.outletPending || 0,
+              completed: stats.completed || 0,
+              issues: stats.issues || 0,
+              timestamp: Date.now()
+          };
           console.debug('[SDRS] syncDashboardStats done', window.globalStats);
       }
 
