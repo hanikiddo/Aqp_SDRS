@@ -186,6 +186,7 @@
      </section>
    </main>
 
+   <script src="../shared/state.js"></script>
    <script>
      const filters = {
        type: 'all',
@@ -272,12 +273,34 @@
        return date <= end;
      }
 
-     function getOrders() {
-       const manager = window.SDRSStateManager;
-       if (manager) {
-         return manager.getState('adminGlobalPipeline');
+     function safeParseJson(value, fallback = []) {
+       try {
+         const parsed = JSON.parse(value);
+         if (Array.isArray(parsed)) return parsed;
+         if (parsed && typeof parsed === 'object' && Array.isArray(parsed.value)) return parsed.value;
+         return fallback;
+       } catch (error) {
+         return fallback;
        }
-       return JSON.parse(localStorage.getItem('adminGlobalPipeline') || localStorage.getItem('sdrs_main_orders') || '[]');
+     }
+
+     function getOrders() {
+       const storageKey = 'adminGlobalPipeline';
+       const manager = window.SDRSStateManager;
+       let orders = [];
+
+       if (manager && typeof manager.getState === 'function') {
+         orders = manager.getState(storageKey);
+       }
+
+       if (!Array.isArray(orders) || orders.length === 0) {
+         orders = safeParseJson(localStorage.getItem(storageKey), []);
+       }
+
+       console.log('[SDRS PIPELINE] storage key used:', storageKey);
+       console.log('[SDRS PIPELINE] records loaded:', Array.isArray(orders) ? orders.length : 0);
+
+       return Array.isArray(orders) ? orders : [];
      }
 
      function updateCurrentDateTime() {
@@ -294,7 +317,9 @@
 
      function getComplaints() {
        const manager = window.SDRSStateManager;
-       let complaints = manager ? manager.getState('complaints') : (JSON.parse(localStorage.getItem('sdrs_complaints')) || []);
+       let complaints = manager && typeof manager.getState === 'function'
+         ? manager.getState('complaints')
+         : safeParseJson(localStorage.getItem('complaints'), safeParseJson(localStorage.getItem('sdrs_complaints'), []));
        
        // Deduplicate: keep only latest complaint per orderId + xfer combination
        // Prioritize complaints that have responses
@@ -324,11 +349,12 @@
        
        // Update localStorage if duplicates were removed
        if (deduped.length !== complaints.length) {
-               if (window.SDRSStateManager) {
-                   window.SDRSStateManager.setState('complaints', deduped);
-               } else {
-                   localStorage.setItem('sdrs_complaints', JSON.stringify(deduped));
-               }
+         if (window.SDRSStateManager) {
+           window.SDRSStateManager.setState('complaints', deduped);
+         } else {
+           localStorage.setItem('complaints', JSON.stringify(deduped));
+         }
+       }
        
        return deduped;
      }
@@ -484,8 +510,9 @@
        if (filters.type === 'completed') return (order.status || '').toString().toUpperCase() === 'COMPLETED';
        if (filters.type === 'pending') return ['CREATED', 'PENDING', 'PENDING_DRIVER'].includes((order.status || '').toString().toUpperCase()) || ['VERIFIED_BY_DRIVER', 'VERIFIED BY DRIVER'].includes((order.status || '').toString().toUpperCase());
        if (filters.type === 'issues') {
+         const status = (order.status || '').toString().toUpperCase();
          const complaints = getComplaints().filter(item => item.orderId === order.id || item.transferId === order.transferId || item.xfer === order.xfer);
-         return order.hasIssue || complaints.length > 0;
+         return order.hasIssue || complaints.length > 0 || ['REJECTED', 'MISMATCH', 'DISCREPANCY', 'ISSUE', 'PROBLEM'].includes(status);
        }
        if (filters.type === 'rejected') return ['DISCREPANCY', 'MISMATCH', 'REJECTED'].includes((order.status || '').toString().toUpperCase());
        return true;
@@ -496,21 +523,29 @@
        const completed = filteredOrders.filter(o => (o.status || '').toString().toUpperCase() === 'COMPLETED').length;
        const pending = filteredOrders.filter(o => ['CREATED', 'PENDING', 'PENDING_DRIVER', 'VERIFIED_BY_DRIVER', 'VERIFIED BY DRIVER'].includes((o.status || '').toString().toUpperCase())).length;
        const issues = filteredOrders.filter(o => {
+         const status = (o.status || '').toString().toUpperCase();
          const complaints = getComplaints().filter(item => item.orderId === o.id || item.transferId === o.transferId || item.xfer === o.xfer);
-         return o.hasIssue || complaints.length > 0;
+         return o.hasIssue || complaints.length > 0 || ['REJECTED', 'MISMATCH', 'DISCREPANCY', 'ISSUE', 'PROBLEM'].includes(status);
        }).length;
 
        document.getElementById('summaryTotal').textContent = totalOrders;
        document.getElementById('summaryCompleted').textContent = completed;
        document.getElementById('summaryPending').textContent = pending;
        document.getElementById('summaryIssues').textContent = issues;
-       document.getElementById('highlightVisible').textContent = visibleCount;
-       document.getElementById('highlightCompleted').textContent = completed;
-       document.getElementById('highlightPending').textContent = pending;
-       document.getElementById('highlightIssues').textContent = issues;
-       document.getElementById('highlightDescription').textContent = visibleCount === totalOrders
-         ? 'Showing all active orders.'
-         : `Showing ${visibleCount} of ${totalOrders} orders after filtering/search.`;
+       const highlightVisible = document.getElementById('highlightVisible');
+       const highlightCompleted = document.getElementById('highlightCompleted');
+       const highlightPending = document.getElementById('highlightPending');
+       const highlightIssues = document.getElementById('highlightIssues');
+       const highlightDescription = document.getElementById('highlightDescription');
+       if (highlightVisible) highlightVisible.textContent = visibleCount;
+       if (highlightCompleted) highlightCompleted.textContent = completed;
+       if (highlightPending) highlightPending.textContent = pending;
+       if (highlightIssues) highlightIssues.textContent = issues;
+       if (highlightDescription) {
+         highlightDescription.textContent = visibleCount === totalOrders
+           ? 'Showing all active orders.'
+           : `Showing ${visibleCount} of ${totalOrders} orders after filtering/search.`;
+       }
      }
 
      function renderTable() {
@@ -535,7 +570,7 @@
              <td class="align-top text-sm text-slate-700">${order.outletName || 'N/A'}</td>
              <td class="align-top text-sm text-slate-700">${order.driverName || 'N/A'}</td>
              <td class="align-top text-sm text-slate-700">${order.transferId || order.xfer || 'N/A'}</td>
-            <td class="align-top text-sm text-slate-700">${order.totalPackages || order.boxes || order.total || '0'}</td>
+             <td class="align-top text-sm text-slate-700">${order.totalBoxes || order.totalPackages || order.boxes || order.total || '0'}</td>
              <td class="align-top text-sm text-slate-700">${getStatusBadge(order.status)}</td>
              <td class="align-top text-sm text-slate-700">${getOutletStatus(order)}</td>
              <td class="align-top text-sm text-slate-700">${getComplaintRows(order)}</td>
@@ -547,7 +582,7 @@
        }).join('') : '<tr><td class="px-6 py-8 text-sm text-slate-500 text-center" colspan="11">No matching records found.</td></tr>';
        tbody.innerHTML = filtered.length ? tbody.innerHTML : tbody.innerHTML;
        renderSummary(filtered, orders.length);
-       console.log('[SDRS PIPELINE] rendered rows:', filtered.length);
+       console.log('[SDRS PIPELINE] rows rendered:', filtered.length);
        document.getElementById('printDate').textContent = new Date().toLocaleString();
      }
 
