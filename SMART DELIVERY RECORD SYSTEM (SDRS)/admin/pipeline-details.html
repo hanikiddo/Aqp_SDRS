@@ -549,13 +549,7 @@
      }
 
      function renderTable() {
-       const orders = getOrders().sort((a, b) => {
-         const ta = a.lastUpdated || a.createdDate || a.updatedAt || a.createdAt || 0;
-         const tb = b.lastUpdated || b.createdDate || b.updatedAt || b.createdAt || 0;
-         const timeA = new Date(ta).getTime();
-         const timeB = new Date(tb).getTime();
-         return (Number.isNaN(timeB) ? 0 : timeB) - (Number.isNaN(timeA) ? 0 : timeA);
-       });
+       const orders = getOrders();
        const filtered = orders.filter(order => {
          const pass = filterOrder(order);
          const match = filters.query ? matchesFilter(order, filters.query) : true;
