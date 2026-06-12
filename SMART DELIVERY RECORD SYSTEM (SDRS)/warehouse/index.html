@@ -209,6 +209,9 @@
     function selectOutlet(id, name) {
       selectedOutletId = id;
       selectedOutletName = name;
+      localStorage.setItem('selectedOutletId', id);
+      localStorage.setItem('selectedOutletName', name);
+      localStorage.setItem('selectedOutlet', JSON.stringify({ id, name }));
       document.getElementById('xferPreview').textContent = `${id} - ${name}`;
       document.getElementById('selected-outlet-display').textContent = name;
       document.getElementById('outletSubtitle').textContent = name;
@@ -329,9 +332,10 @@
         minute: '2-digit'
       });
 
-      const transferID = window.SDRSStateManager && typeof window.SDRSStateManager.generateTransferId === 'function'
+      const storedOutletId = String(localStorage.getItem('selectedOutletId') || selectedOutletId || '').trim();
+      const transferID = storedOutletId || (window.SDRSStateManager && typeof window.SDRSStateManager.generateTransferId === 'function'
         ? window.SDRSStateManager.generateTransferId()
-        : `${selectedOutletId}-${now.getTime()}`;
+        : `XFER-${now.getTime()}`);
 
       const order = {
         id: transferID,

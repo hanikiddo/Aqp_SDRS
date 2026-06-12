@@ -100,6 +100,10 @@
         `;
 
         card.onclick = () => {
+            localStorage.setItem('selectedOutletId', outlet.id);
+            localStorage.setItem('selectedOutletName', outlet.name);
+            localStorage.setItem('selectedOutlet', JSON.stringify(outlet));
+
             const orderId = localStorage.getItem("temp_last_order_id");
             if (orderId && window.sdrsOrders) {
                 const order = window.sdrsOrders.find(o => o.id === orderId);

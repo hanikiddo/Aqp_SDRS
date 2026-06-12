@@ -77,7 +77,7 @@
     }
   };
 
-  const INVALID_XFER_IDS = new Set(['xfer-1001', 'xfer-1002', 'XFER-1001', 'XFER-1002']);
+  const INVALID_XFER_IDS = new Set([]);
 
   function normalizeXferValue(value) {
     return String(value || '').trim().toLowerCase();

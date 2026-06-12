@@ -194,9 +194,13 @@ function clearAllState() {
 }
 
 function generateTransferId() {
-    window.xferCounter += 1;
-    persistState();
-    return `XFER-${window.xferCounter}`;
+    const selectedOutletId = String(localStorage.getItem('selectedOutletId') || '').trim();
+    if (selectedOutletId) {
+        return selectedOutletId;
+    }
+
+    const fallbackTransferId = `XFER-${Date.now()}`;
+    return fallbackTransferId;
 }
 
 function migrateLegacyData() {
