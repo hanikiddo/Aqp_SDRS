@@ -515,9 +515,11 @@
 
      function renderTable() {
        const orders = getOrders().sort((a, b) => {
-         const ta = a.lastUpdated || a.createdDate || 0;
-         const tb = b.lastUpdated || b.createdDate || 0;
-         return tb - ta;
+         const ta = a.lastUpdated || a.createdDate || a.updatedAt || a.createdAt || 0;
+         const tb = b.lastUpdated || b.createdDate || b.updatedAt || b.createdAt || 0;
+         const timeA = new Date(ta).getTime();
+         const timeB = new Date(tb).getTime();
+         return (Number.isNaN(timeB) ? 0 : timeB) - (Number.isNaN(timeA) ? 0 : timeA);
        });
        const filtered = orders.filter(order => {
          const pass = filterOrder(order);
@@ -545,6 +547,7 @@
        }).join('') : '<tr><td class="px-6 py-8 text-sm text-slate-500 text-center" colspan="11">No matching records found.</td></tr>';
        tbody.innerHTML = filtered.length ? tbody.innerHTML : tbody.innerHTML;
        renderSummary(filtered, orders.length);
+       console.log('[SDRS PIPELINE] rendered rows:', filtered.length);
        document.getElementById('printDate').textContent = new Date().toLocaleString();
      }
 
