@@ -106,6 +106,53 @@
         .sort((a, b) => (b.time || 0) - (a.time || 0))[0] || null;
     }
 
+    // Match the restored Supabase payload shapes used by the order detail page.
+    function getOrderItems(order) {
+      return [
+        order.items,
+        order.xfers,
+        order.xferItems,
+        order.selectedItems,
+        order.transferItems,
+        order.payload
+      ].find(items => Array.isArray(items) && items.length) || [];
+    }
+
+    function getItemName(item) {
+      if (typeof item === 'string') return item;
+      return item.name || item.xferNumber || item.xferNo || item.sku || item.id || 'Unknown XFER';
+    }
+
+    function getItemBoxes(item) {
+      if (typeof item === 'number') return item;
+      if (typeof item === 'string') return 1;
+      return parseInt(
+        item.totalBoxes ||
+        item.total_boxes ||
+        item.boxes ||
+        item.qty ||
+        item.quantity ||
+        item.expectedQty ||
+        item.total ||
+        0,
+        10
+      ) || 0;
+    }
+
+    function getOrderTotalBoxes(order, items) {
+      const savedTotal = parseInt(
+        order.totalBoxes ||
+        order.total_boxes ||
+        order.boxes ||
+        order.qty ||
+        order.quantity ||
+        order.total ||
+        0,
+        10
+      ) || 0;
+      return savedTotal > 0 ? savedTotal : items.reduce((sum, item) => sum + getItemBoxes(item), 0);
+    }
+
     function renderOrders() {
       const container = document.getElementById('ordersContainer');
       const emptyState = document.getElementById('emptyState');
@@ -134,13 +181,13 @@
       arrivingOrders.forEach(order => {
         const transferId = order.id || 'UNKNOWN';
         const outletName = order.outletName || order.outlet || 'Unknown Outlet';
-        const xferItems = Array.isArray(order.xfers) ? order.xfers : [];
-        const totalBoxes = xferItems.reduce((sum, item) => sum + (parseInt(item.totalBoxes, 10) || 0), 0);
+        const orderItems = getOrderItems(order);
+        const totalBoxes = getOrderTotalBoxes(order, orderItems);
         const communication = getLatestOrderCommunication(order.id);
 
-        const itemRows = xferItems.map(item => {
-          const xferNumber = item.xferNumber || item.xferNo || item.name || 'Unknown XFER';
-          const boxes = parseInt(item.totalBoxes, 10) || 0;
+        const itemRows = orderItems.map(item => {
+          const xferNumber = getItemName(item);
+          const boxes = getItemBoxes(item);
           return `
             <div class="flex items-center justify-between py-3 border-b border-slate-200 last:border-b-0">
               <div class="text-sm font-semibold text-slate-900">${xferNumber}</div>
