@@ -169,15 +169,15 @@
               } else {
                   responseSection = `
                       <div class="mt-4 flex gap-2">
-                          <input type="text" id="reply-${c.time}" placeholder="Type resolution response here..." class="flex-1 rounded-lg border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-sm bg-slate-50">
-                          <button onclick="submitResponse(${c.time})" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-bold transition-all shadow-sm">Reply</button>
+                          <input type="text" id="reply-${c.time}" data-complaint-id="${c.time}" placeholder="Type resolution response here..." class="flex-1 rounded-lg border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-sm bg-slate-50">
+                          <button type="button" data-reply-button data-complaint-id="${c.time}" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-bold transition-all shadow-sm">Reply</button>
                       </div>
                   `;
               }
 
               let statusClasses = 'text-slate-600 bg-slate-200 border-slate-300';
               if(c.status === 'NEW' || c.status === 'READ') statusClasses = 'text-red-700 bg-red-100 border-red-200'; // Keep it red if not resolved
-              if(c.status === 'RESPONDED') statusClasses = 'text-blue-700 bg-blue-100 border-blue-200';
+              if(['RESPONDED', 'REPLIED', 'RESOLVED'].includes(c.status)) statusClasses = 'text-blue-700 bg-blue-100 border-blue-200';
 
               const outletName = outletMap[c.outletId] || "Unknown Outlet";
               card.innerHTML = `
@@ -200,29 +200,167 @@
               `;
               list.appendChild(card);
           });
+          attachReplyListeners();
           if(window.lucide) window.lucide.createIcons();
       }
 
-      function submitResponse(timeId) {
-          const complaints = JSON.parse(localStorage.getItem("sdrs_complaints")) || [];
-          const idx = complaints.findIndex(c => c.time === timeId);
-          if (idx !== -1) {
-              const input = document.getElementById('reply-' + timeId);
-              if (input && input.value.trim()) {
-                  complaints[idx].response = input.value.trim();
-                  complaints[idx].responseBy = 'Admin';
-                  complaints[idx].responseTime = Date.now();
-                  complaints[idx].status = "RESPONDED";
-                  if (window.SDRSStateManager) {
-                      window.SDRSStateManager.setState('complaints', complaints);
-                  } else {
-                      localStorage.setItem("sdrs_complaints", JSON.stringify(complaints));
-                  }
-                  // Notify other tabs/dashboard that complaints have been updated
-                  window.dispatchEvent(new Event('local_state_updated'));
-                  loadComplaints();
-              }
+      function safeParseArray(value) {
+          try {
+              const parsed = JSON.parse(value);
+              if (Array.isArray(parsed)) return parsed;
+              if (parsed && typeof parsed === 'object' && Array.isArray(parsed.value)) return parsed.value;
+          } catch (error) {
+              return [];
           }
+          return [];
+      }
+
+      function getStoredComplaints() {
+          const manager = window.SDRSStateManager;
+          if (manager && typeof manager.getState === 'function') {
+              const stateComplaints = manager.getState('complaints');
+              if (Array.isArray(stateComplaints) && stateComplaints.length) return stateComplaints;
+          }
+          const primary = safeParseArray(localStorage.getItem('complaints'));
+          if (primary.length) return primary;
+          return safeParseArray(localStorage.getItem('sdrs_complaints'));
+      }
+
+      function matchesComplaintId(complaint, id) {
+          return String(complaint.time || complaint.id || complaint.complaintId || '') === String(id);
+      }
+
+      function normalizeKey(value) {
+          return value === null || value === undefined ? '' : String(value).trim();
+      }
+
+      function orderMatchesComplaint(order, complaint) {
+          const orderKeys = [order.id, order.orderId, order.transferId, order.dispatchId, order.xfer, order.transfer]
+              .map(normalizeKey)
+              .filter(Boolean);
+          const complaintKeys = [complaint.orderId, complaint.transferId, complaint.dispatchId, complaint.xfer, complaint.transfer]
+              .map(normalizeKey)
+              .filter(Boolean);
+          return orderKeys.some(key => complaintKeys.includes(key));
+      }
+
+      function addReplyToOrder(order, complaint) {
+          const replyRecord = {
+              complaintTime: complaint.time,
+              orderId: complaint.orderId || complaint.transferId || '',
+              xfer: complaint.xfer || complaint.transfer || '',
+              text: complaint.response,
+              response: complaint.response,
+              responseBy: complaint.responseBy || 'Admin',
+              responseTime: complaint.responseTime
+          };
+          const adminReplies = Array.isArray(order.adminReplies) ? order.adminReplies.filter(reply => {
+              return String(reply.complaintTime || '') !== String(complaint.time || '');
+          }) : [];
+
+          return {
+              ...order,
+              admin_reply: complaint.response,
+              adminReply: complaint.response,
+              adminReplies: [...adminReplies, replyRecord],
+              complaintStatus: complaint.status,
+              lastUpdated: Date.now(),
+              updatedAt: Date.now()
+          };
+      }
+
+      function updateMatchingOrders(complaint) {
+          const manager = window.SDRSStateManager;
+          const stateKeys = ['warehouseTransfers', 'driverQueue', 'driverHistory', 'outletIncomingQueue', 'outletHistory', 'adminGlobalPipeline'];
+          const legacyKeys = ['sdrs_main_orders', 'sdrs_orders', 'orders', 'warehouse_xfer_data', 'driver_tasks', 'driver_history', 'outlet_incoming', 'sdrs_outlet_history', 'sdrs_records', 'adminGlobalPipeline'];
+
+          if (manager && typeof manager.getState === 'function' && typeof manager.setState === 'function') {
+              stateKeys.forEach((key) => {
+                  const records = manager.getState(key);
+                  let changed = false;
+                  const updated = records.map((record) => {
+                      if (!orderMatchesComplaint(record, complaint)) return record;
+                      changed = true;
+                      return addReplyToOrder(record, complaint);
+                  });
+                  if (changed) manager.setState(key, updated);
+              });
+              return;
+          }
+
+          legacyKeys.forEach((key) => {
+              const records = safeParseArray(localStorage.getItem(key));
+              if (!records.length) return;
+              let changed = false;
+              const updated = records.map((record) => {
+                  if (!orderMatchesComplaint(record, complaint)) return record;
+                  changed = true;
+                  return addReplyToOrder(record, complaint);
+              });
+              if (changed) localStorage.setItem(key, JSON.stringify(updated));
+          });
+      }
+
+      function persistComplaints(complaints) {
+          if (window.SDRSStateManager) {
+              window.SDRSStateManager.setState('complaints', complaints);
+          }
+          localStorage.setItem('complaints', JSON.stringify(complaints));
+          localStorage.setItem('sdrs_complaints', JSON.stringify(complaints));
+      }
+
+      function notifyReplySaved() {
+          if (window.SDRSStateManager && typeof window.SDRSStateManager.syncAllModules === 'function') {
+              window.SDRSStateManager.syncAllModules();
+          }
+          window.dispatchEvent(new Event('local_state_updated'));
+          window.dispatchEvent(new Event('state_sync'));
+      }
+
+      function attachReplyListeners() {
+          document.querySelectorAll('[data-reply-button]').forEach((button) => {
+              button.addEventListener('click', () => submitResponse(button.dataset.complaintId));
+          });
+      }
+
+      function submitResponse(timeId) {
+          console.log('[COMPLAINT REPLY] clicked');
+          const complaints = getStoredComplaints();
+          const idx = complaints.findIndex(c => matchesComplaintId(c, timeId));
+          if (idx === -1) return;
+
+          const input = Array.from(document.querySelectorAll('input[data-complaint-id]'))
+              .find((field) => String(field.dataset.complaintId) === String(timeId));
+          const replyText = input ? input.value.trim() : '';
+          console.log('[COMPLAINT REPLY] order id', complaints[idx].orderId || complaints[idx].transferId || complaints[idx].xfer || timeId);
+          console.log('[COMPLAINT REPLY] text', replyText);
+          if (!replyText) return;
+
+          const savedAt = Date.now();
+          const updatedComplaint = {
+              ...complaints[idx],
+              response: replyText,
+              admin_reply: replyText,
+              adminReplies: [
+                  ...(Array.isArray(complaints[idx].adminReplies) ? complaints[idx].adminReplies : []),
+                  {
+                      text: replyText,
+                      response: replyText,
+                      responseBy: 'Admin',
+                      responseTime: savedAt
+                  }
+              ],
+              responseBy: 'Admin',
+              responseTime: savedAt,
+              status: 'REPLIED'
+          };
+          complaints[idx] = updatedComplaint;
+          persistComplaints(complaints);
+          updateMatchingOrders(updatedComplaint);
+          notifyReplySaved();
+          if (input) input.value = '';
+          console.log('[COMPLAINT REPLY] saved');
+          loadComplaints();
       }
 
       document.addEventListener('DOMContentLoaded', () => {
