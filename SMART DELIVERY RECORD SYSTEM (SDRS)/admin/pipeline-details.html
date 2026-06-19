@@ -402,8 +402,8 @@
          <table class="min-w-full text-left text-sm text-slate-700">
            <thead>
              <tr>
-               <th>Outlet ID</th>
-               <th>Outlet Name</th>
+               <th>From Outlet</th>
+               <th>To Outlet / Warehouse</th>
                <th>Driver</th>
                <th>XFER / Transfer</th>
                <th>Total Boxes</th>
@@ -634,7 +634,7 @@
      function getStatusBadge(status) {
        const normalized = (status || '').toString().toUpperCase();
        if (normalized === 'COMPLETED') return '<span class="badge-pill bg-emerald-100 text-emerald-800">Completed</span>';
-       if (normalized === 'CREATED' || normalized === 'PENDING' || normalized === 'PENDING_DRIVER') return '<span class="badge-pill bg-amber-100 text-amber-800">Pending</span>';
+       if (normalized === 'CREATED' || normalized === 'PENDING' || normalized === 'PENDING_DRIVER' || normalized === 'OUTLET_TRANSFER_PENDING') return '<span class="badge-pill bg-amber-100 text-amber-800">Pending</span>';
        if (normalized === 'VERIFIED_BY_DRIVER' || normalized === 'VERIFIED BY DRIVER') return '<span class="badge-pill bg-sky-100 text-sky-800">In Transit</span>';
        if (normalized === 'DISCREPANCY') return '<span class="badge-pill bg-red-100 text-red-800">Driver Issue</span>';
        if (normalized === 'MISMATCH') return '<span class="badge-pill bg-red-100 text-red-800">Outlet Mismatch</span>';
@@ -644,6 +644,7 @@
      function getOutletStatus(order) {
        const normalized = (order.status || '').toString().toUpperCase();
        if (normalized === 'COMPLETED') return 'Received';
+       if (normalized === 'OUTLET_TRANSFER_PENDING') return 'Pending Transfer';
        if (normalized === 'CREATED' || normalized === 'PENDING' || normalized === 'PENDING_DRIVER' || normalized === 'VERIFIED_BY_DRIVER' || normalized === 'VERIFIED BY DRIVER') return 'Not Received';
        return order.outletStatus || 'Not Received';
      }
@@ -721,9 +722,39 @@
        return order.outletId || order.selectedOutlet?.id || order.destinationOutletId || order.outlet || order.xfer || 'N/A';
      }
 
+     function getOrderItems(order) {
+       return order.items || order.xfers || order.xferItems || [];
+     }
+
+     function getSourceOutletText(order) {
+       const id = order.sourceOutletId || order.outletId || order.selectedOutlet?.id || order.outlet || 'N/A';
+       const name = order.sourceOutletName || order.outletName || '';
+       return name ? `${id}<div class="mt-1 text-xs font-semibold text-slate-500">${name}</div>` : id;
+     }
+
+     function getDestinationText(order) {
+       if (order.destinationType === 'Warehouse') return 'Warehouse';
+       if (order.destinationOutletName || order.destinationOutletId) {
+         return `${order.destinationOutletId || ''}${order.destinationOutletName ? `<div class="mt-1 text-xs font-semibold text-slate-500">${order.destinationOutletName}</div>` : ''}`;
+       }
+       return order.destinationName || order.outletName || 'N/A';
+     }
+
+     function getItemText(order) {
+       return getOrderItems(order).map(item => item.xferNumber || item.xferNo || item.name || 'Unknown').filter(Boolean).join(', ') || order.transferId || order.xfer || 'N/A';
+     }
+
+     function getTotalBoxes(order) {
+       if (order.totalBoxes || order.totalPackages || order.boxes || order.total) return order.totalBoxes || order.totalPackages || order.boxes || order.total;
+       return getOrderItems(order).reduce((sum, item) => sum + (parseInt(item.totalBoxes || item.qty || item.boxes || item.expectedQty, 10) || 0), 0);
+     }
+
      function matchesFilter(order, query) {
        const orderText = [
          getOutletId(order),
+         order.sourceOutletName,
+         order.destinationName,
+         order.destinationOutletName,
          order.outletName,
          order.driverName,
          order.transferId,
@@ -758,7 +789,7 @@
 
      function filterOrder(order) {
        if (filters.type === 'completed') return (order.status || '').toString().toUpperCase() === 'COMPLETED';
-       if (filters.type === 'pending') return ['CREATED', 'PENDING', 'PENDING_DRIVER'].includes((order.status || '').toString().toUpperCase()) || ['VERIFIED_BY_DRIVER', 'VERIFIED BY DRIVER'].includes((order.status || '').toString().toUpperCase());
+       if (filters.type === 'pending') return ['CREATED', 'PENDING', 'PENDING_DRIVER', 'OUTLET_TRANSFER_PENDING'].includes((order.status || '').toString().toUpperCase()) || ['VERIFIED_BY_DRIVER', 'VERIFIED BY DRIVER'].includes((order.status || '').toString().toUpperCase());
        if (filters.type === 'issues') {
          const status = (order.status || '').toString().toUpperCase();
          const complaints = getComplaints().filter(item => item.orderId === order.id || item.transferId === order.transferId || item.xfer === order.xfer);
@@ -771,7 +802,7 @@
      function renderSummary(filteredOrders, totalOrders) {
        const visibleCount = filteredOrders.length;
        const completed = filteredOrders.filter(o => (o.status || '').toString().toUpperCase() === 'COMPLETED').length;
-       const pending = filteredOrders.filter(o => ['CREATED', 'PENDING', 'PENDING_DRIVER', 'VERIFIED_BY_DRIVER', 'VERIFIED BY DRIVER'].includes((o.status || '').toString().toUpperCase())).length;
+       const pending = filteredOrders.filter(o => ['CREATED', 'PENDING', 'PENDING_DRIVER', 'OUTLET_TRANSFER_PENDING', 'VERIFIED_BY_DRIVER', 'VERIFIED BY DRIVER'].includes((o.status || '').toString().toUpperCase())).length;
        const issues = filteredOrders.filter(o => {
          const status = (o.status || '').toString().toUpperCase();
          const complaints = getComplaints().filter(item => item.orderId === o.id || item.transferId === o.transferId || item.xfer === o.xfer);
@@ -810,11 +841,11 @@
        tbody.innerHTML = filtered.length ? filtered.map(order => {
          return `
            <tr class="align-top">
-             <td class="align-top text-sm text-slate-700">${getOutletId(order)}</td>
-             <td class="align-top text-sm text-slate-700">${order.outletName || 'N/A'}</td>
+             <td class="align-top text-sm text-slate-700">${getSourceOutletText(order)}</td>
+             <td class="align-top text-sm text-slate-700">${getDestinationText(order)}</td>
              <td class="align-top text-sm text-slate-700">${order.driverName || 'N/A'}</td>
-             <td class="align-top text-sm text-slate-700">${order.transferId || order.xfer || 'N/A'}</td>
-             <td class="align-top text-sm text-slate-700">${order.totalBoxes || order.totalPackages || order.boxes || order.total || '0'}</td>
+             <td class="align-top text-sm text-slate-700">${getItemText(order)}</td>
+             <td class="align-top text-sm text-slate-700">${getTotalBoxes(order) || '0'}</td>
              <td class="align-top text-sm text-slate-700">${getStatusBadge(order.status)}</td>
              <td class="align-top text-sm text-slate-700">${getOutletStatus(order)}</td>
              <td class="align-top text-sm text-slate-700">${getComplaintRows(order)}</td>

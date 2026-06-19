@@ -107,7 +107,7 @@
     </div>
 
     <!-- Modules Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 fade-up delay-2">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 fade-up delay-2">
       
       <!-- Warehouse Module -->
       <div class="group flex flex-col bg-white border border-slate-200 rounded-2xl overflow-hidden card-shadow hover:shadow-lg hover:border-amber-500/50 hover:-translate-y-1 transition-all duration-300">
@@ -166,6 +166,26 @@
             <h2 class="text-lg font-extrabold text-navy mb-2">Outlet Receiver</h2>
             <p class="text-slate-500 text-sm mb-6 flex-1">Check and acknowledge inventory deliveries by local branch team.</p>
             <a href="outlet/select-outlet.html" onclick="handleLoad(this)" class="inline-flex items-center justify-center gap-2 bg-white border-2 border-slate-200 hover:border-purple-500 hover:text-purple-700 text-navy font-bold py-2 px-4 rounded-xl transition-colors w-full group/btn text-sm">
+                <i data-lucide="external-link" class="icon-default group-hover/btn:scale-110 transition-transform" style="width:16px;height:16px;"></i>
+                <i data-lucide="loader-2" class="icon-spinner" style="width:16px;height:16px;"></i>
+                <span class="btn-text">Access Module</span>
+            </a>
+        </div>
+      </div>
+
+      <!-- Outlet Sender Module -->
+      <div class="group flex flex-col bg-white border border-slate-200 rounded-2xl overflow-hidden card-shadow hover:shadow-lg hover:border-sky-500/50 hover:-translate-y-1 transition-all duration-300">
+        <!-- Decoration indicating outlet transfer styling -->
+        <div class="bg-slate-50 h-32 flex items-center justify-center border-b border-slate-100 relative overflow-hidden group-hover:bg-sky-50 transition-colors">
+            <i data-lucide="send" class="text-sky-500 relative z-10" style="width:40px;height:40px;"></i>
+        </div>
+        <div class="p-6 flex-1 flex flex-col">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="bg-sky-50 text-sky-600 text-xs font-bold px-2 py-1 rounded">Outlet Transfer</span>
+            </div>
+            <h2 class="text-lg font-extrabold text-navy mb-2">Outlet Sender</h2>
+            <p class="text-slate-500 text-sm mb-6 flex-1">Create transfer requests from outlet to outlet or warehouse.</p>
+            <a href="outlet-sender/index.html" onclick="handleLoad(this)" class="inline-flex items-center justify-center gap-2 bg-white border-2 border-slate-200 hover:border-sky-500 hover:text-sky-700 text-navy font-bold py-2 px-4 rounded-xl transition-colors w-full group/btn text-sm">
                 <i data-lucide="external-link" class="icon-default group-hover/btn:scale-110 transition-transform" style="width:16px;height:16px;"></i>
                 <i data-lucide="loader-2" class="icon-spinner" style="width:16px;height:16px;"></i>
                 <span class="btn-text">Access Module</span>
