@@ -418,6 +418,7 @@
            <tbody id="pipelineTableBody"></tbody>
          </table>
        </div>
+       <div id="dailyBoxesSummary" class="border-t border-slate-200 bg-slate-50 p-6"></div>
      </section>
 
      <div class="print-area print-signature-section">
@@ -723,7 +724,14 @@
      }
 
      function getOrderItems(order) {
-       return order.items || order.xfers || order.xferItems || [];
+       return [
+         order.items,
+         order.xfers,
+         order.xferItems,
+         order.selectedItems,
+         order.transferItems,
+         order.payload
+       ].find(items => Array.isArray(items) && items.length) || [];
      }
 
      function getSourceOutletText(order) {
@@ -746,8 +754,91 @@
      }
 
      function getTotalBoxes(order) {
-       if (order.totalBoxes || order.totalPackages || order.boxes || order.total) return order.totalBoxes || order.totalPackages || order.boxes || order.total;
-       return getOrderItems(order).reduce((sum, item) => sum + (parseInt(item.totalBoxes || item.qty || item.boxes || item.expectedQty, 10) || 0), 0);
+       const savedTotal = parseInt(
+         order.totalBoxes ||
+         order.total_boxes ||
+         order.totalPackages ||
+         order.boxes ||
+         order.qty ||
+         order.quantity ||
+         order.total ||
+         0,
+         10
+       ) || 0;
+       if (savedTotal > 0) return savedTotal;
+       return getOrderItems(order).reduce((sum, item) => sum + (parseInt(
+         item.totalBoxes ||
+         item.total_boxes ||
+         item.boxes ||
+         item.qty ||
+         item.quantity ||
+         item.expectedQty ||
+         item.total ||
+         0,
+         10
+       ) || 0), 0);
+     }
+
+     function getSummaryDateValue(order) {
+       const value = order.completedAt || order.receivedAt || order.deliveredAt || order.deliveryDate || order.createdDate || order.createdAt || order.time;
+       const date = new Date(value);
+       return Number.isNaN(date.getTime()) ? null : date;
+     }
+
+     function getDateKey(date) {
+       return [
+         date.getFullYear(),
+         String(date.getMonth() + 1).padStart(2, '0'),
+         String(date.getDate()).padStart(2, '0')
+       ].join('-');
+     }
+
+     function formatSummaryDate(date) {
+       return new Intl.DateTimeFormat('en-GB', {
+         day: 'numeric',
+         month: 'numeric',
+         year: 'numeric'
+       }).format(date);
+     }
+
+     function renderDailyBoxesSummary(records) {
+       const container = document.getElementById('dailyBoxesSummary');
+       if (!container) return;
+
+       const groups = records.reduce((summary, order) => {
+         const date = getSummaryDateValue(order);
+         const key = date ? getDateKey(date) : 'unknown';
+         if (!summary[key]) {
+           summary[key] = {
+             date,
+             label: date ? formatSummaryDate(date) : 'Unknown Date',
+             totalBoxes: 0
+           };
+         }
+         summary[key].totalBoxes += getTotalBoxes(order);
+         return summary;
+       }, {});
+
+       const rows = Object.entries(groups)
+         .sort(([keyA, itemA], [keyB, itemB]) => {
+           if (keyA === 'unknown') return 1;
+           if (keyB === 'unknown') return -1;
+           return itemA.date - itemB.date;
+         })
+         .map(([, item]) => `
+           <div class="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+             <span class="text-sm font-bold text-slate-700">${item.label} Total Boxes:</span>
+             <span class="text-lg font-extrabold text-navy">${item.totalBoxes}</span>
+           </div>
+         `)
+         .join('');
+
+       container.innerHTML = `
+         <div class="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Daily Total Boxes</div>
+         <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+           ${rows || '<div class="text-sm text-slate-500">No box totals for the current filter.</div>'}
+         </div>
+       `;
      }
 
      function matchesFilter(order, query) {
@@ -858,6 +949,7 @@
        }).join('') : '<tr><td class="px-6 py-8 text-sm text-slate-500 text-center" colspan="11">No matching records found.</td></tr>';
        tbody.innerHTML = filtered.length ? tbody.innerHTML : tbody.innerHTML;
        renderSummary(filtered, orders.length);
+       renderDailyBoxesSummary(filtered);
        console.log('[SDRS PIPELINE] rows rendered:', filtered.length);
        document.getElementById('printDate').textContent = new Date().toLocaleString();
      }
