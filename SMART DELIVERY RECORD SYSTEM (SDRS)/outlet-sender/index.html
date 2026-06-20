@@ -171,10 +171,21 @@
     }
 
     function saveToStorage(record) {
+      const isOutletDestination = String(record.destinationType || '').toUpperCase() === 'OUTLET';
       if (window.SDRSStateManager) {
+        if (isOutletDestination) {
+          window.SDRSStateManager.appendState('driverQueue', record);
+        }
         window.SDRSStateManager.appendState('adminGlobalPipeline', record);
         window.SDRSStateManager.syncAllModules();
         return;
+      }
+
+      if (isOutletDestination) {
+        const driverQueue = JSON.parse(localStorage.getItem('driverQueue') || '[]');
+        driverQueue.push(record);
+        localStorage.setItem('driverQueue', JSON.stringify(driverQueue));
+        localStorage.setItem('driver_tasks', JSON.stringify(driverQueue));
       }
 
       const adminPipeline = JSON.parse(localStorage.getItem('adminGlobalPipeline') || '[]');
@@ -188,6 +199,7 @@
 
       const sourceOutlet = getOutletById(document.getElementById('sourceOutlet').value);
       const destinationType = document.getElementById('destinationType').value;
+      const savedDestinationType = destinationType.toUpperCase();
       const destinationOutlet = destinationType === 'Outlet' ? getOutletById(document.getElementById('destinationOutlet').value) : null;
       const itemName = document.getElementById('itemName').value.trim();
       const totalBoxes = parseInt(document.getElementById('totalBoxes').value, 10) || 0;
@@ -208,6 +220,9 @@
       });
       const id = `OTS-${now.getTime()}`;
       const destinationName = destinationType === 'Warehouse' ? 'Warehouse' : destinationOutlet.name;
+      const routeLabel = destinationType === 'Outlet'
+        ? `${sourceOutlet.id} -> ${destinationOutlet.id}`
+        : `${sourceOutlet.id} -> Warehouse`;
       const item = {
         xferNumber: itemName,
         name: itemName,
@@ -220,22 +235,25 @@
         id,
         transferId: id,
         orderId: id,
+        sourceType: 'OUTLET',
         sourceOutletId: sourceOutlet.id,
         sourceOutletName: sourceOutlet.name,
-        outletId: sourceOutlet.id,
-        outletName: sourceOutlet.name,
-        destinationType,
+        outletId: destinationOutlet ? destinationOutlet.id : sourceOutlet.id,
+        outletName: destinationOutlet ? destinationOutlet.name : sourceOutlet.name,
+        destinationType: savedDestinationType,
         destinationOutletId: destinationOutlet ? destinationOutlet.id : '',
         destinationOutletName: destinationOutlet ? destinationOutlet.name : '',
         destinationName,
+        routeLabel,
+        displayTransferId: routeLabel,
         xfer: itemName,
         items: [item],
         xfers: [item],
         xferItems: [item],
         totalBoxes,
         remarks,
-        status: 'OUTLET_TRANSFER_PENDING',
-        outletStatus: 'Pending Transfer',
+        status: 'PENDING_DRIVER',
+        outletStatus: 'PENDING_OUTLET',
         createdAt,
         createdTimestamp: now.getTime(),
         timestamps: { createdAt: now.getTime() }

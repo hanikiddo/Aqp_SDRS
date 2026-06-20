@@ -153,6 +153,22 @@
       return savedTotal > 0 ? savedTotal : items.reduce((sum, item) => sum + getItemBoxes(item), 0);
     }
 
+    function getIncomingOutletId(order) {
+      if (order.destinationOutletId) return order.destinationOutletId;
+      return order.outletId || order.id || '';
+    }
+
+    function getTransferDisplayId(order) {
+      if (String(order.sourceType || '').toUpperCase() === 'OUTLET') {
+        return order.routeLabel || order.displayTransferId || `${order.sourceOutletId || 'OUTLET'} -> ${order.destinationOutletId || 'OUTLET'}`;
+      }
+      return order.transferId || order.id || 'UNKNOWN';
+    }
+
+    function getIncomingOutletName(order) {
+      return order.destinationOutletName || order.outletName || order.outlet || 'Unknown Outlet';
+    }
+
     function renderOrders() {
       const container = document.getElementById('ordersContainer');
       const emptyState = document.getElementById('emptyState');
@@ -163,7 +179,7 @@
       const manager = window.SDRSStateManager;
       const incomingOrders = manager ? manager.getState('outletIncomingQueue') : JSON.parse(localStorage.getItem('outletIncomingQueue') || '[]');
       const arrivingOrders = (incomingOrders || []).filter(order => {
-        return String(order.outletId || '').trim() === String(outletId || '').trim() &&
+        return String(getIncomingOutletId(order)).trim() === String(outletId || '').trim() &&
                String(order.status || '').toUpperCase() === 'VERIFIED_BY_DRIVER';
       });
 
@@ -180,7 +196,8 @@
 
       arrivingOrders.forEach(order => {
         const transferId = order.id || 'UNKNOWN';
-        const outletName = order.outletName || order.outlet || 'Unknown Outlet';
+        const outletName = getIncomingOutletName(order);
+        const transferDisplayId = getTransferDisplayId(order);
         const orderItems = getOrderItems(order);
         const totalBoxes = getOrderTotalBoxes(order, orderItems);
         const communication = getLatestOrderCommunication(order.id);
@@ -231,7 +248,7 @@
             <div class="space-y-4">
               <div>
                 <div class="text-[10px] uppercase tracking-[0.35em] font-bold text-slate-400">Transfer ID</div>
-                <div class="text-2xl font-extrabold text-slate-950">${order.transferId || order.id || transferId}</div>
+                <div class="text-2xl font-extrabold text-slate-950">${transferDisplayId}</div>
               </div>
               <div>
                 <div class="text-[10px] uppercase tracking-[0.35em] font-bold text-slate-400">Outlet Name</div>

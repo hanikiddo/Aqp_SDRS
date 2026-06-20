@@ -729,11 +729,12 @@
      function getSourceOutletText(order) {
        const id = order.sourceOutletId || order.outletId || order.selectedOutlet?.id || order.outlet || 'N/A';
        const name = order.sourceOutletName || order.outletName || '';
-       return name ? `${id}<div class="mt-1 text-xs font-semibold text-slate-500">${name}</div>` : id;
+       const route = order.routeLabel || order.displayTransferId;
+       return `${id}${route ? `<div class="mt-1 text-xs font-bold text-teal-700">${route}</div>` : ''}${name ? `<div class="mt-1 text-xs font-semibold text-slate-500">${name}</div>` : ''}`;
      }
 
      function getDestinationText(order) {
-       if (order.destinationType === 'Warehouse') return 'Warehouse';
+       if (String(order.destinationType || '').toUpperCase() === 'WAREHOUSE') return 'Warehouse';
        if (order.destinationOutletName || order.destinationOutletId) {
          return `${order.destinationOutletId || ''}${order.destinationOutletName ? `<div class="mt-1 text-xs font-semibold text-slate-500">${order.destinationOutletName}</div>` : ''}`;
        }

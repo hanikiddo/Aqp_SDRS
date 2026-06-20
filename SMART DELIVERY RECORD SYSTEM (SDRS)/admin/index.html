@@ -562,11 +562,12 @@
       function getSourceOutletLabel(order) {
           const id = order.sourceOutletId || order.outletId || (order.selectedOutlet && order.selectedOutlet.id) || order.outlet || 'NO OUTLET ID';
           const name = order.sourceOutletName || order.outletName || '';
-          return name ? `${id}<div class="text-[11px] font-semibold text-slate-500 mt-1">${name}</div>` : id;
+          const route = order.routeLabel || order.displayTransferId;
+          return `${id}${route ? `<div class="text-[11px] font-bold text-teal mt-1">${route}</div>` : ''}${name ? `<div class="text-[11px] font-semibold text-slate-500 mt-1">${name}</div>` : ''}`;
       }
 
       function getDestinationLabel(order) {
-          if (order.destinationType === 'Warehouse') return 'Warehouse';
+          if (String(order.destinationType || '').toUpperCase() === 'WAREHOUSE') return 'Warehouse';
           if (order.destinationOutletName || order.destinationOutletId) {
               return `${order.destinationOutletId || ''}${order.destinationOutletName ? `<div class="text-[11px] font-semibold text-slate-500 mt-1">${order.destinationOutletName}</div>` : ''}`;
           }

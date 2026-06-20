@@ -406,8 +406,8 @@
           updatedComplaints.push({
             orderId: currentOrder.id,
             transferId: currentOrder.id,
-            outletId: currentOrder.outletId || '',
-            outletName: currentOrder.outletName || currentOrder.outlet || '',
+            outletId: currentOrder.destinationOutletId || currentOrder.outletId || '',
+            outletName: currentOrder.destinationOutletName || currentOrder.outletName || currentOrder.outlet || '',
             xfer: item.name,
             remark: item.remark,
             time: Date.now(),
@@ -435,8 +435,8 @@
       };
 
       const historyRecord = {
-        outletId: currentOrder.outletId || currentOrder.outlet || currentOrder.destination || currentOrder.branchName,
-        outletName: currentOrder.outletName || currentOrder.outlet || currentOrder.destination || currentOrder.branchName || 'Unknown Outlet',
+        outletId: currentOrder.destinationOutletId || currentOrder.outletId || currentOrder.outlet || currentOrder.destination || currentOrder.branchName,
+        outletName: currentOrder.destinationOutletName || currentOrder.outletName || currentOrder.outlet || currentOrder.destination || currentOrder.branchName || 'Unknown Outlet',
         orderId: currentOrder.id,
         completedAt: currentOrder.completedAt,
         xferNumbers: (currentOrder.receivedItems || []).map(item => item.name || item.xfer || 'Unknown XFER'),
@@ -488,8 +488,8 @@
 
       localStorage.setItem('sdrs_last_completed_order', JSON.stringify({
         id: currentOrder.id,
-        outletId: currentOrder.outletId,
-        outletName: currentOrder.outletName || currentOrder.outlet || 'Unknown Outlet',
+        outletId: currentOrder.destinationOutletId || currentOrder.outletId,
+        outletName: currentOrder.destinationOutletName || currentOrder.outletName || currentOrder.outlet || 'Unknown Outlet',
         receivedAt: currentOrder.receivedAt,
         receivedItems: verifiedItems,
         hasIssue: currentOrder.hasIssue
@@ -505,14 +505,14 @@
 
     function appendOutletHistory(order) {
       if (!order) return;
-      const outletId = order.outletId || order.outlet || order.destination || order.outletName || order.branchName;
+      const outletId = order.destinationOutletId || order.outletId || order.outlet || order.destination || order.outletName || order.branchName;
       if (!outletId) return;
       const orderKey = String(order.id || order.orderId || order.transferId || order.dispatchId || '').trim();
       if (!orderKey) return;
 
       const historyRecord = {
         outletId: outletId,
-        outletName: order.outletName || order.outlet || order.destination || order.branchName || 'Unknown Outlet',
+        outletName: order.destinationOutletName || order.outletName || order.outlet || order.destination || order.branchName || 'Unknown Outlet',
         orderId: orderKey,
         completedAt: order.completedAt || new Date().toISOString(),
         xferNumbers: (order.receivedItems || []).map(item => item.name || item.xfer || 'Unknown XFER'),
@@ -541,7 +541,8 @@
     function normalizeOrder(rawOrder) {
       if (!rawOrder) return null;
       rawOrder.id = rawOrder.id || rawOrder.orderId || rawOrder.transferId || rawOrder.dispatchId;
-      rawOrder.outletName = rawOrder.outletName || rawOrder.destination || rawOrder.outlet || rawOrder.branchName;
+      rawOrder.outletId = rawOrder.destinationOutletId || rawOrder.outletId;
+      rawOrder.outletName = rawOrder.destinationOutletName || rawOrder.outletName || rawOrder.destination || rawOrder.outlet || rawOrder.branchName;
       rawOrder.items = rawOrder.items || rawOrder.payload || rawOrder.xferItems || rawOrder.itemList || [];
       if (!rawOrder.items.length && Array.isArray(rawOrder.xfers)) {
         rawOrder.items = rawOrder.xfers.map(x => ({ name: x.xferNumber || x.xferNo || x.sku || x.name || 'XFER', qty: x.totalBoxes || x.expectedQty || x.qty || x.boxes || 1 }));
