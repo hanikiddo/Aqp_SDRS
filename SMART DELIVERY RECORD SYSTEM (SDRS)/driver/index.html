@@ -125,6 +125,20 @@
       return order.outletName || order.outlet || 'Unknown Outlet';
     }
 
+    function getHistorySortTime(order) {
+      const value = order.driverVerifiedAt ||
+        order.verifiedAt ||
+        order.completedAt ||
+        order.updatedAt ||
+        order.lastUpdated ||
+        order.createdTimestamp ||
+        order.createdAt;
+      if (!value) return 0;
+      if (typeof value === 'number') return value;
+      const parsed = new Date(value).getTime();
+      return Number.isNaN(parsed) ? 0 : parsed;
+    }
+
     function verifyOrder(orderId) {
       console.log('=== verifyOrder called with orderId:', orderId);
       const manager = window.SDRSStateManager;
@@ -390,6 +404,7 @@ const orderItems = getOrderItems(order);
 
       const manager = window.SDRSStateManager;
       const historyOrders = manager ? manager.getState('driverHistory') : (window.sdrsState?.driverHistory || JSON.parse(localStorage.getItem('driverHistory') || '[]'));
+      const sortedHistoryOrders = [...historyOrders].sort((a, b) => getHistorySortTime(b) - getHistorySortTime(a));
 
       if (historyOrders.length === 0) {
         emptyState.classList.remove('hidden');
@@ -400,7 +415,7 @@ const orderItems = getOrderItems(order);
       emptyState.classList.add('hidden');
       container.classList.remove('hidden');
 
-      historyOrders.forEach(order => {
+      sortedHistoryOrders.forEach(order => {
         const historyItems = getOrderItems(order);
         const totalBoxes = historyItems.reduce((sum, item) => sum + (parseInt(item.totalBoxes || item.qty, 10) || 0), 0);
 
