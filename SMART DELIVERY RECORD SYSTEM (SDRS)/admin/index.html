@@ -214,6 +214,8 @@
 
   <!-- Shared & Modular Scripts -->
   <script src="../shared/state.js"></script>
+  <script src="../shared/supabase-config.js"></script>
+  <script src="../shared/supabase-sync.js"></script>
   <script src="clearDemo.js"></script>
   <script src="exportCSV.js"></script>
   <script>
@@ -274,17 +276,11 @@
           return new Date(timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
       }
 
-      function syncDashboardStats() {
-          const orders = getOrders();
-          const stats = (window.SDRSStats && typeof window.SDRSStats.calculateDashboardStats === 'function')
-              ? window.SDRSStats.calculateDashboardStats(orders)
-              : {
-                  total: orders.length,
-                  driverPending: orders.filter((o) => ['CREATED', 'PENDING_DRIVER', 'PENDING'].includes(String(o.status || '').trim().replace(/\s+/g, '_').toUpperCase())).length,
-                  outletPending: orders.filter((o) => ['VERIFIED_BY_DRIVER', 'VERIFIED BY DRIVER', 'IN_TRANSIT', 'PENDING_OUTLET', 'ARRIVED'].includes(String(o.status || '').trim().replace(/\s+/g, '_').toUpperCase())).length,
-                  completed: orders.filter((o) => String(o.status || '').trim().replace(/\s+/g, '_').toUpperCase() === 'COMPLETED').length,
-                  issues: orders.filter((o) => Boolean(o.hasIssue) || ['REJECTED', 'MISMATCH', 'DISCREPANCY', 'ISSUE'].includes(String(o.status || '').trim().replace(/\s+/g, '_').toUpperCase())).length
-                };
+      async function syncDashboardStats() {
+          const result = (window.SDRSStats && typeof window.SDRSStats.loadDashboardStats === 'function')
+              ? await window.SDRSStats.loadDashboardStats()
+              : { stats: window.SDRSStats.calculateDashboardStats(getOrders()) };
+          const stats = result.stats;
 
           document.getElementById('kpi-total').textContent = stats.total || 0;
           document.getElementById('kpi-driver').textContent = stats.driverPending || 0;
@@ -499,6 +495,30 @@
               console.error('Error parsing orders:', e);
               return [];
           }
+      }
+
+      function mergeOrders(primary, fallback) {
+          const map = new Map();
+          [...(fallback || []), ...(primary || [])].forEach((order) => {
+              if (!order || typeof order !== 'object') return;
+              const key = String(order.id || order.transferId || order.orderId || '').trim();
+              if (key) map.set(key, { ...(map.get(key) || {}), ...order });
+          });
+          return Array.from(map.values());
+      }
+
+      async function loadAdminRecordsFromSupabase() {
+          if (!window.SDRSSupabase) return;
+          const records = await window.SDRSSupabase.safeCall('[SUPABASE] load admin records', () => window.SDRSSupabase.fetchDeliveryRecords());
+          if (!Array.isArray(records)) return;
+          const manager = window.SDRSStateManager;
+          const merged = mergeOrders(records, getOrders());
+          if (manager) {
+              manager.setState('adminGlobalPipeline', merged);
+          } else {
+              localStorage.setItem('adminGlobalPipeline', JSON.stringify(merged));
+          }
+          refreshAdminDashboard();
       }
 
       function getComplaints() {
@@ -986,6 +1006,7 @@
       // Init and listeners - unified sync across all events
       document.addEventListener('DOMContentLoaded', () => {
           migrateOrderStorage();
+          loadAdminRecordsFromSupabase();
           refreshAdminDashboard();
           checkComplaints();
           updateSystem();

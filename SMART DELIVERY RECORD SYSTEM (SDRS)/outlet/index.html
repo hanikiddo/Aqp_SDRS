@@ -85,6 +85,8 @@
   </main>
 
   <script src="../shared/state.js"></script>
+  <script src="../shared/supabase-config.js"></script>
+  <script src="../shared/supabase-sync.js"></script>
   <script>
     lucide.createIcons();
 
@@ -153,9 +155,38 @@
       return savedTotal > 0 ? savedTotal : items.reduce((sum, item) => sum + getItemBoxes(item), 0);
     }
 
+    function normalizeStatus(status) {
+      return String(status || '').trim().replace(/\s+/g, '_').toUpperCase();
+    }
+
+    function getCurrentOutletId() {
+      const paramsOutletId = new URLSearchParams(window.location.search).get('outletId');
+      if (paramsOutletId) return paramsOutletId;
+      const storedOutletId = localStorage.getItem('selectedOutletId');
+      if (storedOutletId) return storedOutletId;
+      try {
+        const selectedOutlet = JSON.parse(localStorage.getItem('selectedOutlet') || '{}');
+        return selectedOutlet.id || '';
+      } catch {
+        return '';
+      }
+    }
+
     function getIncomingOutletId(order) {
+      if (order.outlet_id) return order.outlet_id;
       if (order.destinationOutletId) return order.destinationOutletId;
-      return order.outletId || order.id || '';
+      return order.outletId || order.transferId || order.id || '';
+    }
+
+    function orderMatchesOutlet(order, outletId) {
+      const target = String(outletId || '').trim();
+      if (!target) return false;
+      return [
+        order.outlet_id,
+        order.destinationOutletId,
+        order.outletId,
+        order.transferId
+      ].some(value => String(value || '').trim() === target);
     }
 
     function getTransferDisplayId(order) {
@@ -169,18 +200,87 @@
       return order.destinationOutletName || order.outletName || order.outlet || 'Unknown Outlet';
     }
 
+    function getOrderKey(order) {
+      return String(order.transferId || order.orderId || order.id || order.outletId || order.outlet_id || '').trim();
+    }
+
+    function normalizeSupabaseIncomingOrder(order) {
+      const outletId = order.outletId || order.outlet_id || order.destinationOutletId || order.transferId || '';
+      const transferId = order.transferId || order.orderId || order.outlet_id || outletId || order.id;
+      return {
+        ...order,
+        id: order.id || transferId,
+        transferId,
+        orderId: order.orderId || transferId,
+        outletId,
+        status: 'VERIFIED_BY_DRIVER',
+        delivery_status: 'VERIFIED_BY_DRIVER',
+        outletStatus: 'PENDING_OUTLET',
+        outlet_status: 'PENDING_OUTLET'
+      };
+    }
+
+    async function loadOutletQueueFromSupabase(outletId) {
+      if (!window.SDRSSupabase || !outletId) {
+        renderOrders();
+        return;
+      }
+      const filters = {
+        delivery_status: 'VERIFIED_BY_DRIVER',
+        outlet_status: 'PENDING_OUTLET',
+        outlet_id: outletId
+      };
+      console.log('[OUTLET RECEIVER FILTER]', filters);
+      const records = await window.SDRSSupabase.safeCall('[SUPABASE] load outlet queue', () => window.SDRSSupabase.fetchDeliveryRecords(filters));
+      if (!Array.isArray(records)) {
+        renderOrders();
+        return;
+      }
+      console.log('[OUTLET RECEIVER RECORDS]', records);
+      const rebuiltQueue = records
+        .filter(order => normalizeStatus(order.delivery_status || order.status) === 'VERIFIED_BY_DRIVER')
+        .filter(order => normalizeStatus(order.outlet_status || order.outletStatus) === 'PENDING_OUTLET')
+        .filter(order => orderMatchesOutlet(order, outletId))
+        .map(normalizeSupabaseIncomingOrder);
+
+      const manager = window.SDRSStateManager;
+      if (manager) {
+        const localOrders = manager.getState('outletIncomingQueue');
+        const otherLocal = localOrders.filter(order => !orderMatchesOutlet(order, outletId));
+        const merged = new Map();
+        [...otherLocal, ...rebuiltQueue].forEach(order => {
+          const key = getOrderKey(order);
+          if (key) merged.set(key, order);
+        });
+        manager.setState('outletIncomingQueue', Array.from(merged.values()));
+      } else if (window.sdrsState) {
+        const localOrders = window.sdrsState.outletIncomingQueue || [];
+        const otherLocal = localOrders.filter(order => !orderMatchesOutlet(order, outletId));
+        const merged = new Map();
+        [...otherLocal, ...rebuiltQueue].forEach(order => {
+          const key = getOrderKey(order);
+          if (key) merged.set(key, order);
+        });
+        window.sdrsState.outletIncomingQueue = Array.from(merged.values());
+        localStorage.setItem('outletIncomingQueue', JSON.stringify(window.sdrsState.outletIncomingQueue));
+        if (typeof persistState === 'function') persistState();
+      }
+      renderOrders();
+    }
+
     function renderOrders() {
       const container = document.getElementById('ordersContainer');
       const emptyState = document.getElementById('emptyState');
       const countEl = document.getElementById('taskCount');
       container.innerHTML = '';
 
-      const outletId = new URLSearchParams(window.location.search).get('outletId');
+      const outletId = getCurrentOutletId();
       const manager = window.SDRSStateManager;
       const incomingOrders = manager ? manager.getState('outletIncomingQueue') : JSON.parse(localStorage.getItem('outletIncomingQueue') || '[]');
       const arrivingOrders = (incomingOrders || []).filter(order => {
-        return String(getIncomingOutletId(order)).trim() === String(outletId || '').trim() &&
-               String(order.status || '').toUpperCase() === 'VERIFIED_BY_DRIVER';
+        return orderMatchesOutlet(order, outletId) &&
+               normalizeStatus(order.delivery_status || order.status) === 'VERIFIED_BY_DRIVER' &&
+               normalizeStatus(order.outlet_status || order.outletStatus || 'PENDING_OUTLET') === 'PENDING_OUTLET';
       });
 
       countEl.textContent = arrivingOrders.length;
@@ -410,7 +510,9 @@
 
     window.addEventListener('sdrs_sync', renderOrders);
     window.addEventListener('local_state_updated', renderOrders);
-    document.addEventListener('DOMContentLoaded', renderOrders);
+    document.addEventListener('DOMContentLoaded', () => {
+      loadOutletQueueFromSupabase(getCurrentOutletId());
+    });
   </script>
 </body>
 </html>

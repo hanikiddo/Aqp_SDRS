@@ -183,8 +183,86 @@
   </main>
 
   <script src="../shared/state.js"></script>
+  <script src="../shared/supabase-config.js"></script>
+  <script src="../shared/supabase-sync.js?v=delivery-records-insert-20260620"></script>
   <script>
     lucide.createIcons();
+
+    (function installWarehouseDeliveryInsert() {
+      const existingApi = window.SDRSSupabase || {};
+
+      function getWarehouseItems(record) {
+        return [
+          record.items,
+          record.xfers,
+          record.xferItems,
+          record.selectedItems,
+          record.transferItems,
+          record.payload
+        ].find((items) => Array.isArray(items) && items.length) || [];
+      }
+
+      function getWarehouseTotalBoxes(record) {
+        const total = parseInt(record.totalBoxes || record.total_boxes || record.boxes || record.qty || record.quantity || record.total || 0, 10) || 0;
+        if (total > 0) return total;
+        return getWarehouseItems(record).reduce((sum, item) => sum + (parseInt(item.totalBoxes || item.total_boxes || item.boxes || item.qty || item.quantity || item.expectedQty || 0, 10) || 0), 0);
+      }
+
+      function toWarehouseInsertRecord(record) {
+        const items = record.items || record.xferItems || record.xfers || [];
+        const transferId = record.transferId || record.id || record.orderId;
+        const orderId = record.orderId || record.transferId || record.id;
+        const { id, status, ...recordWithoutId } = record;
+        const remarks = {
+          ...recordWithoutId,
+          transferId,
+          orderId,
+          items,
+          xfers: record.xfers || items,
+          originalRemarks: record.remarks || ''
+        };
+
+        return {
+          outlet_id: record.destinationOutletId || record.outletId || record.outlet || '',
+          outlet_name: record.destinationOutletName || record.outletName || record.outlet || '',
+          driver: record.driverName || record.driver || '',
+          total_boxes: getWarehouseTotalBoxes(record),
+          delivery_status: 'PENDING_DRIVER',
+          outlet_status: 'PENDING_OUTLET',
+          remarks: JSON.stringify(remarks),
+          admin_reply: record.adminReply || record.admin_reply || ''
+        };
+      }
+
+      async function insertWarehouseDeliveryRecord(record) {
+        const transferId = String(record?.transferId || record?.id || record?.orderId || '').trim();
+        const config = window.SDRSSupabaseConfig || {};
+        if (!transferId || !config.url || !config.anonKey) return null;
+
+        const response = await fetch(`${config.url.replace(/\/$/, '')}/rest/v1/delivery_records`, {
+          method: 'POST',
+          headers: {
+            apikey: config.anonKey,
+            Authorization: `Bearer ${config.anonKey}`,
+            'Content-Type': 'application/json',
+            Prefer: 'return=representation'
+          },
+          body: JSON.stringify(toWarehouseInsertRecord(record))
+        });
+        const text = await response.text();
+        const rows = text ? JSON.parse(text) : null;
+        if (!response.ok) {
+          throw new Error(rows?.message || rows?.hint || `Supabase request failed: ${response.status}`);
+        }
+        return Array.isArray(rows) && rows[0] && existingApi.fromDbRecord ? existingApi.fromDbRecord(rows[0]) : rows;
+      }
+
+      window.SDRSSupabase = {
+        ...existingApi,
+        saveDeliveryRecord: insertWarehouseDeliveryRecord
+      };
+      window.SDRSWarehouseInsertDeliveryRecord = insertWarehouseDeliveryRecord;
+    })();
 
     const SDRS_ORDER_VERSION_KEY = 'sdrs_main_orders_version';
     const SDRS_ORDER_VERSION = '2';
@@ -302,7 +380,7 @@
       addXferRow();
     }
 
-    function generateOrder(event) {
+    async function generateOrder(event) {
       event.preventDefault();
       if (!selectedOutletId || !selectedOutletName) {
         showError('Sila pilih outlet terlebih dahulu.');
@@ -374,6 +452,10 @@
         localStorage.setItem('warehouseTransfers', JSON.stringify(warehouseOrders));
         localStorage.setItem('driverQueue', JSON.stringify(window.sdrsState.driverQueue || []));
         localStorage.setItem('adminGlobalPipeline', JSON.stringify(window.sdrsState.adminGlobalPipeline || []));
+      }
+
+      if (window.SDRSSupabase) {
+        await window.SDRSSupabase.safeCall('[SUPABASE] create order', () => window.SDRSWarehouseInsertDeliveryRecord(order));
       }
 
       localStorage.setItem('sdrs_last_order', JSON.stringify({

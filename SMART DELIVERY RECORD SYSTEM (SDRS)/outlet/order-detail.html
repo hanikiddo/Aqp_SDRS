@@ -84,6 +84,8 @@
   <div id="toastContainer" class="fixed bottom-6 right-6 z-50"></div>
 
   <script src="../shared/state.js"></script>
+  <script src="../shared/supabase-config.js"></script>
+  <script src="../shared/supabase-sync.js"></script>
   <script>
     lucide.createIcons();
 
@@ -380,7 +382,7 @@
       }
     }
 
-    function completeOrder(e) {
+    async function completeOrder(e) {
       e.preventDefault();
       const cards = Array.from(document.querySelectorAll('#itemsContainer > .item-card'));
       const readyCards = cards.filter(card => card.dataset.status && card.dataset.status !== 'pending');
@@ -424,6 +426,8 @@
       }
 
       currentOrder.status = 'COMPLETED';
+      currentOrder.delivery_status = 'COMPLETED';
+      currentOrder.outlet_status = 'COMPLETED';
       currentOrder.outletStatus = 'COMPLETED';
       currentOrder.receivedAt = new Date().toISOString();
       currentOrder.completedAt = currentOrder.receivedAt;
@@ -433,6 +437,10 @@
         ...(currentOrder.timestamps || {}),
         completedAt: Date.now()
       };
+
+      if (window.SDRSSupabase) {
+        await window.SDRSSupabase.safeCall('[SUPABASE] complete outlet', () => window.SDRSSupabase.updateDeliveryRecord(currentOrder.id || currentOrder.transferId, currentOrder));
+      }
 
       const historyRecord = {
         outletId: currentOrder.destinationOutletId || currentOrder.outletId || currentOrder.outlet || currentOrder.destination || currentOrder.branchName,

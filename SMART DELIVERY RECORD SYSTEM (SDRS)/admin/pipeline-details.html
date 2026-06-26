@@ -438,6 +438,8 @@
    </main>
 
    <script src="../shared/state.js"></script>
+   <script src="../shared/supabase-config.js"></script>
+   <script src="../shared/supabase-sync.js"></script>
    <script>
      const filters = {
        type: 'all',
@@ -552,6 +554,19 @@
        console.log('[SDRS PIPELINE] records loaded:', Array.isArray(orders) ? orders.length : 0);
 
        return Array.isArray(orders) ? orders : [];
+     }
+
+     async function loadPipelineRecordsFromSupabase() {
+       if (!window.SDRSSupabase) return;
+       const records = await window.SDRSSupabase.safeCall('[SUPABASE] load admin records', () => window.SDRSSupabase.fetchDeliveryRecords());
+       if (!Array.isArray(records)) return;
+       const manager = window.SDRSStateManager;
+       if (manager && typeof manager.setState === 'function') {
+         manager.setState('adminGlobalPipeline', records);
+       } else {
+         localStorage.setItem('adminGlobalPipeline', JSON.stringify(records));
+       }
+       renderTable();
      }
 
      function updateCurrentDateTime() {
@@ -965,6 +980,7 @@
      document.addEventListener('DOMContentLoaded', () => {
        populateMonthYearControls();
        setDateFilterType('all');
+       loadPipelineRecordsFromSupabase();
        renderTable();
        setFilter('all');
        updateCurrentDateTime();

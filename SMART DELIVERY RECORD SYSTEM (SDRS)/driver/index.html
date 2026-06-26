@@ -81,6 +81,8 @@
   </main>
 
   <script src="../shared/state.js"></script>
+  <script src="../shared/supabase-config.js"></script>
+  <script src="../shared/supabase-sync.js"></script>
   <script>
     lucide.createIcons();
 
@@ -115,7 +117,7 @@
       if (String(order.sourceType || '').toUpperCase() === 'OUTLET') {
         return order.routeLabel || order.displayTransferId || `${order.sourceOutletId || 'OUTLET'} -> ${order.destinationOutletId || 'WAREHOUSE'}`;
       }
-      return order.displayTransferId || order.id || order.transferId || 'Unknown Transfer';
+      return order.displayTransferId || order.transferId || order.orderId || order.outletId || order.id || 'Unknown Transfer';
     }
 
     function getTransferDisplayName(order) {
@@ -139,15 +141,52 @@
       return Number.isNaN(parsed) ? 0 : parsed;
     }
 
-    function verifyOrder(orderId) {
+    function normalizeStatus(status) {
+      return String(status || '').trim().replace(/\s+/g, '_').toUpperCase();
+    }
+
+    function getOrderKey(order) {
+      return String(order?.transferId || order?.orderId || order?.outletId || order?.outlet_id || order?.id || '').trim();
+    }
+
+    function mergeOrders(primary, fallback) {
+      const map = new Map();
+      [...(fallback || []), ...(primary || [])].forEach((order) => {
+        if (!order || typeof order !== 'object') return;
+        const key = getOrderKey(order);
+        if (key) map.set(key, { ...(map.get(key) || {}), ...order });
+      });
+      return Array.from(map.values());
+    }
+
+    async function loadDriverRecordsFromSupabase() {
+      if (!window.SDRSSupabase) return;
+      const records = await window.SDRSSupabase.safeCall('[SUPABASE] load driver records', () => window.SDRSSupabase.fetchDeliveryRecords());
+      if (!Array.isArray(records)) return;
+      const pendingRecords = records.filter(order => normalizeStatus(order.delivery_status) === 'PENDING_DRIVER');
+      const historyRecords = records.filter(order => ['VERIFIED_BY_DRIVER', 'COMPLETED', 'REJECTED'].includes(normalizeStatus(order.delivery_status)));
+      const manager = window.SDRSStateManager;
+      if (manager) {
+        manager.setState('driverQueue', pendingRecords);
+        manager.setState('driverHistory', historyRecords);
+      } else if (window.sdrsState) {
+        window.sdrsState.driverQueue = pendingRecords;
+        window.sdrsState.driverHistory = historyRecords;
+        if (typeof persistState === 'function') persistState();
+      }
+      renderDriverTasks();
+      renderHistory();
+    }
+
+    async function verifyOrder(orderId) {
       console.log('=== verifyOrder called with orderId:', orderId);
       const manager = window.SDRSStateManager;
       const pendingOrders = manager ? manager.getState('driverQueue') : (window.sdrsState?.driverQueue || []);
-      let order = pendingOrders.find(o => String(o.id) === String(orderId) || String(o.transferId) === String(orderId));
+      let order = pendingOrders.find(o => getOrderKey(o) === String(orderId));
 
       if (!order) {
         const warehouseOrders = manager ? manager.getState('warehouseTransfers') : (window.sdrsState?.warehouseTransfers || []);
-        order = warehouseOrders.find(o => String(o.id) === String(orderId) || String(o.transferId) === String(orderId));
+        order = warehouseOrders.find(o => getOrderKey(o) === String(orderId));
       }
 
       if (!order) {
@@ -155,16 +194,21 @@
         return;
       }
 
-      console.log('verifyOrder: found order', order.id, 'status:', order.status);
+      const orderKey = getOrderKey(order);
+      console.log('verifyOrder: found order', orderKey, 'status:', order.status);
       const now = new Date();
       const verifiedAt = now.toISOString();
 
       const updatedOrder = {
         ...order,
+        id: orderKey,
+        transferId: order.transferId || order.orderId || order.outletId || order.outlet_id || orderKey,
         status: 'VERIFIED_BY_DRIVER',
+        delivery_status: 'VERIFIED_BY_DRIVER',
         driverStatus: 'VERIFIED_BY_DRIVER',
         outletStatus: 'PENDING_OUTLET',
-        outletId: order.destinationOutletId || order.outletId,
+        outlet_status: 'PENDING_OUTLET',
+        outletId: order.destinationOutletId || order.outletId || order.outlet_id || order.transferId,
         outletName: order.destinationOutletName || order.outletName,
         verifiedAt,
         verifiedTimestamp: now.getTime(),
@@ -181,11 +225,25 @@
       };
 
       const verifiedItems = getOrderItems(updatedOrder);
+      const incomingOrder = {
+        ...updatedOrder,
+        transferId: updatedOrder.transferId || updatedOrder.orderId || updatedOrder.outletId || updatedOrder.outlet_id || updatedOrder.id,
+        outletId: updatedOrder.destinationOutletId || updatedOrder.outletId || updatedOrder.outlet_id || updatedOrder.transferId,
+        outletName: updatedOrder.destinationOutletName || updatedOrder.outletName || updatedOrder.outlet || '',
+        xferItems: verifiedItems,
+        items: updatedOrder.items || verifiedItems,
+        xfers: updatedOrder.xfers || verifiedItems,
+        totalBoxes: updatedOrder.totalBoxes || verifiedItems.reduce((sum, item) => sum + (parseInt(item.totalBoxes || item.qty, 10) || 0), 0),
+        status: 'VERIFIED_BY_DRIVER',
+        delivery_status: 'VERIFIED_BY_DRIVER',
+        outletStatus: 'PENDING_OUTLET',
+        outlet_status: 'PENDING_OUTLET'
+      };
       const historyRecord = {
-        id: updatedOrder.id,
-        transferId: updatedOrder.transferId,
-        outletId: updatedOrder.outletId,
-        outletName: updatedOrder.outletName,
+        id: incomingOrder.transferId,
+        transferId: incomingOrder.transferId,
+        outletId: incomingOrder.outletId,
+        outletName: incomingOrder.outletName,
         sourceType: updatedOrder.sourceType,
         sourceOutletId: updatedOrder.sourceOutletId,
         sourceOutletName: updatedOrder.sourceOutletName,
@@ -198,32 +256,54 @@
         verifiedAt,
         date: verifiedAt,
         status: 'VERIFIED_BY_DRIVER',
-        xferItems: verifiedItems,
-        totalBoxes: updatedOrder.totalBoxes || verifiedItems.reduce((sum, item) => sum + (parseInt(item.totalBoxes || item.qty, 10) || 0), 0)
+        delivery_status: 'VERIFIED_BY_DRIVER',
+        outletStatus: 'PENDING_OUTLET',
+        outlet_status: 'PENDING_OUTLET',
+        xferItems: incomingOrder.xferItems,
+        totalBoxes: incomingOrder.totalBoxes
       };
 
+      if (window.SDRSSupabase) {
+        const supabaseRecordId = incomingOrder.supabaseId || incomingOrder.dbId;
+        const updateTarget = supabaseRecordId || incomingOrder.transferId || incomingOrder.orderId || incomingOrder.outletId;
+        console.log('[DRIVER VERIFY UPDATE PAYLOAD]', {
+          updateTarget,
+          payload: {
+            id: incomingOrder.id,
+            dbId: incomingOrder.dbId,
+            supabaseId: incomingOrder.supabaseId,
+            outlet_id: incomingOrder.outlet_id,
+            outletId: incomingOrder.outletId,
+            transferId: incomingOrder.transferId,
+            delivery_status: incomingOrder.delivery_status,
+            outlet_status: incomingOrder.outlet_status
+          }
+        });
+        await window.SDRSSupabase.safeCall('[SUPABASE] verify driver', () => window.SDRSSupabase.updateDeliveryRecord(updateTarget, incomingOrder));
+      }
+
       if (manager) {
-        manager.removeState('driverQueue', orderId);
+        manager.removeState('driverQueue', orderKey);
         console.log('verifyOrder: removed from driverQueue');
         manager.appendState('driverHistory', historyRecord);
         console.log('verifyOrder: added to driverHistory');
-        manager.appendState('outletIncomingQueue', updatedOrder);
+        manager.appendState('outletIncomingQueue', incomingOrder);
         console.log('verifyOrder: pushed to outletIncomingQueue');
         manager.updateState('warehouseTransfers', (orders) => orders.map((item) => {
-          if (String(item.id) === String(updatedOrder.id) || String(item.transferId) === String(updatedOrder.transferId)) {
-            return { ...item, ...updatedOrder };
+          if (getOrderKey(item) === orderKey) {
+            return { ...item, ...incomingOrder };
           }
           return item;
         }));
         manager.updateState('adminGlobalPipeline', (pipeline) => {
-          const idx = pipeline.findIndex((entry) => String(entry.transferId) === String(updatedOrder.transferId) || String(entry.id) === String(updatedOrder.id));
+          const idx = pipeline.findIndex((entry) => getOrderKey(entry) === orderKey);
           if (idx === -1) {
             return [...pipeline, { ...updatedOrder }];
           }
           const next = [...pipeline];
           next[idx] = {
             ...next[idx],
-            ...updatedOrder,
+            ...incomingOrder,
             status: 'VERIFIED_BY_DRIVER',
             driverStatus: 'VERIFIED_BY_DRIVER',
             outletStatus: 'PENDING_OUTLET'
@@ -232,16 +312,16 @@
         });
         manager.syncAllModules();
       } else {
-        window.sdrsState.driverQueue = (window.sdrsState.driverQueue || []).filter(task => String(task.id) !== String(orderId));
+        window.sdrsState.driverQueue = (window.sdrsState.driverQueue || []).filter(task => getOrderKey(task) !== orderKey);
         window.sdrsState.driverHistory = [historyRecord, ...(window.sdrsState.driverHistory || [])];
-        window.sdrsState.outletIncomingQueue = [...(window.sdrsState.outletIncomingQueue || []), updatedOrder];
+        window.sdrsState.outletIncomingQueue = [...(window.sdrsState.outletIncomingQueue || []), incomingOrder];
         window.sdrsState.warehouseTransfers = (window.sdrsState.warehouseTransfers || []).map((item) => {
-          if (String(item.id) === String(updatedOrder.id) || String(item.transferId) === String(updatedOrder.transferId)) {
-            return { ...item, ...updatedOrder };
+          if (getOrderKey(item) === orderKey) {
+            return { ...item, ...incomingOrder };
           }
           return item;
         });
-        window.sdrsState.adminGlobalPipeline = [...(window.sdrsState.adminGlobalPipeline || []).filter(entry => String(entry.id) !== String(updatedOrder.id)), updatedOrder];
+        window.sdrsState.adminGlobalPipeline = [...(window.sdrsState.adminGlobalPipeline || []).filter(entry => getOrderKey(entry) !== orderKey), incomingOrder];
         persistState();
       }
 
@@ -252,8 +332,8 @@
     }
 
     function isDriverPendingStatus(status) {
-      const normalized = String(status || '').toUpperCase();
-      return ['PENDING_DRIVER', 'CREATED', 'PENDING'].includes(normalized);
+      const normalized = normalizeStatus(status);
+      return normalized === 'PENDING_DRIVER';
     }
 
     function renderDriverTasks() {
@@ -264,7 +344,7 @@
 
       const manager = window.SDRSStateManager;
       const orders = manager ? manager.getState('driverQueue') : (window.sdrsState?.driverQueue || JSON.parse(localStorage.getItem('driverQueue') || '[]'));
-      const pendingOrders = (orders || []).filter(order => isDriverPendingStatus(order.status));
+      const pendingOrders = (orders || []).filter(order => isDriverPendingStatus(order.delivery_status));
       taskCount.textContent = `${pendingOrders.length} Task${pendingOrders.length !== 1 ? 's' : ''}`;
 
       if (pendingOrders.length === 0) {
@@ -283,13 +363,14 @@ const orderItems = getOrderItems(order);
 
         const card = document.createElement('div');
         card.className = 'bg-white border border-slate-200 rounded-3xl p-5 card-shadow';
-        card.dataset.orderId = order.id;
+        const orderKey = getOrderKey(order);
+        card.dataset.orderId = orderKey;
 
         const xferChecklist = orderItems.map(item => `
           <label class="xfer-label flex justify-between w-full items-center rounded-2xl border border-slate-200 bg-slate-50 p-3 cursor-pointer transition-colors" data-box-count="${item.totalBoxes || item.qty || 0}">
             <span class="text-sm font-semibold text-slate-800">${item.xferNumber || item.name || item.sku || 'Item'}</span>
             <span class="text-sm font-semibold text-slate-800">${item.totalBoxes || item.qty || 0} Boxes</span>
-            <input type="checkbox" data-order-id="${order.id}" data-xfer-number="${item.xferNumber || item.name || item.sku || 'Item'}" data-box-count="${item.totalBoxes || item.qty || 0}" class="h-6 w-6 accent-teal-500 text-teal-600 rounded-sm" />
+            <input type="checkbox" data-order-id="${orderKey}" data-xfer-number="${item.xferNumber || item.name || item.sku || 'Item'}" data-box-count="${item.totalBoxes || item.qty || 0}" class="h-6 w-6 accent-teal-500 text-teal-600 rounded-sm" />
           </label>
         `).join('') || '<div class="text-sm text-slate-500">No XFER numbers available.</div>';
 
@@ -313,11 +394,11 @@ const orderItems = getOrderItems(order);
               ${xferChecklist}
             </div>
             <div class="mt-4 text-sm">
-              Verified: <span class="live-count" data-order-id="${order.id}">0</span> / ${totalBoxes}
+              Verified: <span class="live-count" data-order-id="${orderKey}">0</span> / ${totalBoxes}
             </div>
           </div>
           <div class="mt-6 flex flex-col sm:flex-row sm:justify-end gap-3">
-            <button type="button" data-order-id="${order.id}" data-ready="false" class="verify-btn w-full sm:w-auto inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-200 px-5 py-3 text-sm font-bold text-slate-500 transition-all cursor-not-allowed" disabled>
+            <button type="button" data-order-id="${orderKey}" data-ready="false" class="verify-btn w-full sm:w-auto inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-200 px-5 py-3 text-sm font-bold text-slate-500 transition-all cursor-not-allowed" disabled>
               Verify Order
             </button>
           </div>
@@ -368,7 +449,7 @@ const orderItems = getOrderItems(order);
         });
 
         verifyBtn.addEventListener('click', () => {
-          verifyOrder(order.id);
+          verifyOrder(orderKey);
         });
 
         if (liveCountSpan) {
@@ -421,7 +502,7 @@ const orderItems = getOrderItems(order);
 
         const card = document.createElement('div');
         card.className = 'bg-white border border-slate-200 rounded-3xl p-5 card-shadow';
-        card.dataset.orderId = order.id;
+        card.dataset.orderId = getOrderKey(order);
 
         card.innerHTML = `
           <div class="grid gap-4 sm:grid-cols-3 sm:items-center">
@@ -523,6 +604,7 @@ const orderItems = getOrderItems(order);
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+      loadDriverRecordsFromSupabase();
       renderDriverTasks();
       renderHistory();
     });

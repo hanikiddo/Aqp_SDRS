@@ -83,6 +83,8 @@
   <div id="toastContainer" class="fixed bottom-6 right-6 z-50"></div>
 
   <script src="../shared/state.js"></script>
+  <script src="../shared/supabase-config.js"></script>
+  <script src="../shared/supabase-sync.js"></script>
   <script>
     lucide.createIcons();
 
@@ -260,7 +262,7 @@
       }
     }
 
-    function completeOrder(e) {
+    async function completeOrder(e) {
       e.preventDefault();
       const cards = Array.from(document.querySelectorAll('#itemsContainer > .item-card'));
       const confirmedCards = cards.filter(card => card.dataset.confirmed === 'true');
@@ -292,9 +294,14 @@
       localStorage.setItem('sdrs_complaints', JSON.stringify(complaints));
 
       currentOrder.status = 'COMPLETED';
+      currentOrder.outletStatus = 'COMPLETED';
       currentOrder.receivedAt = new Date().toISOString();
       currentOrder.receivedItems = verifiedItems;
       currentOrder.hasIssue = verifiedItems.some(item => item.remark !== '');
+
+      if (window.SDRSSupabase) {
+        await window.SDRSSupabase.safeCall('[SUPABASE] complete outlet', () => window.SDRSSupabase.updateDeliveryRecord(currentOrder.id || currentOrder.transferId, currentOrder));
+      }
 
       const orders = JSON.parse(localStorage.getItem('sdrs_main_orders') || '[]');
       const orderIndex = orders.findIndex(o => String(o.id) === String(currentOrder.id));

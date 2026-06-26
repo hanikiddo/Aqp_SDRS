@@ -152,16 +152,65 @@ function collectDashboardOrders() {
     return Array.from(orderMap.values());
 }
 
-function calculateDashboardStats(orders = collectDashboardOrders()) {
-    const list = Array.isArray(orders) ? orders : collectDashboardOrders();
+function calculateDashboardStats(orders = []) {
+    const list = Array.isArray(orders) ? orders : [];
 
     const total = list.length;
-    const driverPending = list.filter((order) => ['CREATED', 'PENDING_DRIVER', 'PENDING'].includes(normalizeStatus(order.status))).length;
-    const outletPending = list.filter((order) => ['VERIFIED_BY_DRIVER', 'VERIFIED BY DRIVER', 'IN_TRANSIT', 'PENDING_OUTLET', 'ARRIVED'].includes(normalizeStatus(order.status))).length;
-    const completed = list.filter((order) => normalizeStatus(order.status) === 'COMPLETED').length;
-    const issues = list.filter((order) => Boolean(order.hasIssue) || ['REJECTED', 'MISMATCH', 'DISCREPANCY', 'ISSUE'].includes(normalizeStatus(order.status))).length;
+    const driverPending = list.filter((order) => normalizeStatus(order.delivery_status) === 'PENDING_DRIVER').length;
+    const outletPending = list.filter((order) =>
+        normalizeStatus(order.delivery_status || order.status) === 'VERIFIED_BY_DRIVER' &&
+        normalizeStatus(order.outlet_status || order.outletStatus) === 'PENDING_OUTLET'
+    ).length;
+    const completed = list.filter((order) =>
+        normalizeStatus(order.delivery_status || order.status) === 'COMPLETED' ||
+        normalizeStatus(order.outlet_status || order.outletStatus) === 'COMPLETED'
+    ).length;
+    const issues = list.filter((order) =>
+        Boolean(order.hasIssue) ||
+        Boolean(order.issue) ||
+        Boolean(order.mismatch) ||
+        Boolean(order.discrepancy) ||
+        Boolean(order.complaint) ||
+        (Array.isArray(order.complaints) && order.complaints.length > 0)
+    ).length;
 
     return { total, driverPending, outletPending, completed, issues, orders: list };
+}
+
+async function loadDashboardStats(fallbackOrders = null) {
+    let source = 'localStorage';
+    let records = Array.isArray(fallbackOrders) ? fallbackOrders : null;
+
+    if (window.SDRSSupabase && typeof window.SDRSSupabase.isConfigured === 'function' && window.SDRSSupabase.isConfigured()) {
+        const supabaseRecords = await window.SDRSSupabase.safeCall(
+            '[SUPABASE] load dashboard stats',
+            () => window.SDRSSupabase.fetchDeliveryRecords()
+        );
+        if (Array.isArray(supabaseRecords)) {
+            records = supabaseRecords;
+            source = 'supabase';
+        }
+    }
+
+    if (!Array.isArray(records)) {
+        records = collectDashboardOrders();
+    }
+
+    const stats = calculateDashboardStats(records);
+    if (source === 'supabase') {
+        console.log('[DASHBOARD USING SUPABASE ONLY]', {
+            totalRecords: records.length,
+            pendingDriver: stats.driverPending,
+            pendingOutlet: stats.outletPending,
+            completed: stats.completed
+        });
+    }
+    console.log('[DASHBOARD STATS SOURCE]', {
+        source,
+        recordCount: records.length,
+        stats
+    });
+    return { source, records, stats };
 }
 
 function loadStateValue(key) {
@@ -364,9 +413,11 @@ function migrateLegacyData() {
 
 window.STORAGE_KEYS = STORAGE_KEYS;
 window.clearAllSDRSData = clearAllSDRSData;
+window.loadDashboardStats = loadDashboardStats;
 window.SDRSStats = {
     collectDashboardOrders,
-    calculateDashboardStats
+    calculateDashboardStats,
+    loadDashboardStats
 };
 window.SDRSStateManager = {
     getState,

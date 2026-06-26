@@ -243,6 +243,8 @@
   </main>
 
   <script src="shared/state.js"></script>
+  <script src="shared/supabase-config.js"></script>
+  <script src="shared/supabase-sync.js"></script>
   <script>
       lucide.createIcons();
 
@@ -369,20 +371,12 @@
       };
       window.SDRSStorageManager = SDRSStorageManager;
 
-      function syncDashboardStats() {
+      async function syncDashboardStats() {
           console.debug('[SDRS] syncDashboardStats start');
-          const orders = (window.SDRSStats && typeof window.SDRSStats.collectDashboardOrders === 'function')
-              ? window.SDRSStats.collectDashboardOrders()
-              : SDRSStorageManager.getAllOrders();
-          const stats = (window.SDRSStats && typeof window.SDRSStats.calculateDashboardStats === 'function')
-              ? window.SDRSStats.calculateDashboardStats(orders)
-              : {
-                  total: orders.length,
-                  driverPending: orders.filter((o) => ['CREATED', 'PENDING_DRIVER', 'PENDING'].includes(normalizeStatus(o.status))).length,
-                  outletPending: orders.filter((o) => ['VERIFIED_BY_DRIVER', 'VERIFIED BY DRIVER', 'IN_TRANSIT', 'PENDING_OUTLET', 'ARRIVED'].includes(normalizeStatus(o.status))).length,
-                  completed: orders.filter((o) => normalizeStatus(o.status) === 'COMPLETED').length,
-                  issues: orders.filter((o) => Boolean(o.hasIssue) || ['REJECTED', 'MISMATCH', 'DISCREPANCY', 'ISSUE'].includes(normalizeStatus(o.status))).length
-                };
+          const result = (typeof window.loadDashboardStats === 'function')
+              ? await window.loadDashboardStats()
+              : { stats: window.SDRSStats.calculateDashboardStats(SDRSStorageManager.getAllOrders()) };
+          const stats = result.stats;
 
           const totalEl = document.getElementById('stat-total');
           const driverPendingEl = document.getElementById('stat-driver-pending');
@@ -408,7 +402,9 @@
       window.updateGlobalStats = syncDashboardStats;
       window.updateDashboardStats = syncDashboardStats;
 
-      syncDashboardStats();
+      document.addEventListener('DOMContentLoaded', () => {
+          window.loadDashboardStats().then(() => syncDashboardStats());
+      });
 
       window.addEventListener('storage', (event) => {
           console.debug('[SDRS] storage event', event.key, event.newValue ? 'updated' : 'removed');
