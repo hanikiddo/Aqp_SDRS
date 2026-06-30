@@ -158,6 +158,14 @@
     return Array.isArray(rows) ? rows.map(fromDbRecord) : null;
   }
 
+  async function deleteAllDeliveryRecords() {
+    await request('?id=not.is.null', {
+      method: 'DELETE',
+      headers: { Prefer: 'return=minimal' }
+    });
+    return true;
+  }
+
   async function saveDeliveryRecord(record) {
     const transferId = String(record?.transferId || record?.id || record?.orderId || '').trim();
     if (!transferId) return null;
@@ -226,6 +234,7 @@
 
   window.SDRSSupabase = {
     fetchDeliveryRecords,
+    deleteAllDeliveryRecords,
     saveDeliveryRecord,
     updateDeliveryRecord,
     updateDeliveryRecordByOutletId,
