@@ -47,6 +47,17 @@ function clearSDRSLocalStorage() {
     }
 }
 
+function resetAdminDashboardView() {
+    ['kpi-total', 'kpi-driver', 'kpi-outlet', 'kpi-complete', 'kpi-issues'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = '0';
+    });
+    const tbody = document.getElementById('recordsTableBody');
+    if (tbody) {
+        tbody.innerHTML = '<tr class="border-b border-navy/5"><td colspan="9" class="px-5 py-10 text-center text-navy/40 text-sm font-medium bg-slate-50/50">Listening for multi-module logistics updates...</td></tr>';
+    }
+}
+
 async function confirmClearDemo() {
     closeDeleteConfirmModal();
 
@@ -64,6 +75,7 @@ async function confirmClearDemo() {
     }
 
     clearSDRSLocalStorage();
+    resetAdminDashboardView();
 
     if (typeof refreshAdminDashboard === 'function') {
         refreshAdminDashboard();

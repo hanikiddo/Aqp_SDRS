@@ -508,17 +508,42 @@
       }
 
       async function loadAdminRecordsFromSupabase() {
-          if (!window.SDRSSupabase) return;
+          if (!window.SDRSSupabase || !window.SDRSSupabase.isConfigured || !window.SDRSSupabase.isConfigured()) return false;
           const records = await window.SDRSSupabase.safeCall('[SUPABASE] load admin records', () => window.SDRSSupabase.fetchDeliveryRecords());
-          if (!Array.isArray(records)) return;
+          if (!Array.isArray(records)) return false;
           const manager = window.SDRSStateManager;
-          const merged = mergeOrders(records, getOrders());
+          const merged = records;
           if (manager) {
               manager.setState('adminGlobalPipeline', merged);
+              manager.setState('warehouseTransfers', []);
+              manager.setState('driverQueue', []);
+              manager.setState('driverHistory', []);
+              manager.setState('outletIncomingQueue', []);
+              manager.setState('outletHistory', []);
           } else {
               localStorage.setItem('adminGlobalPipeline', JSON.stringify(merged));
           }
+          localStorage.setItem('adminGlobalPipeline', JSON.stringify(merged));
+          localStorage.setItem('sdrs_main_orders', JSON.stringify(merged));
+          localStorage.setItem('sdrs_records', JSON.stringify(merged));
+          if (records.length === 0) {
+              [
+                  'warehouseTransfers',
+                  'driverQueue',
+                  'driverHistory',
+                  'outletIncomingQueue',
+                  'outletHistory',
+                  'warehouse_xfer_data',
+                  'driver_tasks',
+                  'sdrs_driver_tasks',
+                  'outlet_incoming',
+                  'sdrs_orders',
+                  'orders'
+              ].forEach((key) => localStorage.removeItem(key));
+          }
+          window.sdrsOrders = merged;
           refreshAdminDashboard();
+          return true;
       }
 
       function getComplaints() {
@@ -1004,9 +1029,11 @@
       }
 
       // Init and listeners - unified sync across all events
-      document.addEventListener('DOMContentLoaded', () => {
-          migrateOrderStorage();
-          loadAdminRecordsFromSupabase();
+      document.addEventListener('DOMContentLoaded', async () => {
+          const loadedFromSupabase = await loadAdminRecordsFromSupabase();
+          if (!loadedFromSupabase) {
+              migrateOrderStorage();
+          }
           refreshAdminDashboard();
           checkComplaints();
           updateSystem();
@@ -1050,8 +1077,11 @@
       document.head.appendChild(style);
 
       // Initialize on page load
-      window.onload = () => {
-          migrateOrderStorage();
+      window.onload = async () => {
+          const loadedFromSupabase = await loadAdminRecordsFromSupabase();
+          if (!loadedFromSupabase) {
+              migrateOrderStorage();
+          }
           refreshAdminDashboard();
       };
   </script>
