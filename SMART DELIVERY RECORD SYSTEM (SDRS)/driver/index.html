@@ -113,6 +113,63 @@
       return Array.isArray(order.items) ? order.items : Array.isArray(order.xferItems) ? order.xferItems : Array.isArray(order.xfers) ? order.xfers : [];
     }
 
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[char]));
+    }
+
+    function getOrderRemarks(order) {
+      const normalizeRemarks = (value) => {
+        if (Array.isArray(value)) return value.filter(Boolean).join('\n').trim();
+        if (value && typeof value === 'object') {
+          return String(value.remarks || value.originalRemarks || value.notes || '').trim();
+        }
+        return String(value || '').trim();
+      };
+
+      const directRemarks = normalizeRemarks(order?.remarks);
+      if (directRemarks) return directRemarks;
+
+      const notes = normalizeRemarks(order?.notes);
+      if (notes) return notes;
+
+      const itemRemarks = getOrderItems(order)
+        .map(item => String(item.remarks || item.remark || '').trim())
+        .filter(Boolean);
+      if (itemRemarks.length) return itemRemarks.join(', ');
+
+      const metaRemarks = normalizeRemarks(order?.meta?.remarks || order?.meta?.originalRemarks || order?.meta?.notes);
+      if (metaRemarks) return metaRemarks;
+
+      const rawRemarks = normalizeRemarks(order?.raw?.remarks || order?.supabaseRow?.remarks);
+      if (!rawRemarks) return '';
+
+      try {
+        const parsedRawRemarks = JSON.parse(rawRemarks);
+        return normalizeRemarks(parsedRawRemarks.remarks || parsedRawRemarks.originalRemarks || parsedRawRemarks.notes);
+      } catch (err) {
+        return rawRemarks;
+      }
+    }
+
+    function renderRemarksCard(order) {
+      const remarksText = getOrderRemarks(order) || 'No remarks provided.';
+      return `
+        <div class="mt-4 rounded-2xl border border-amber-200 border-l-4 border-l-amber-500 bg-amber-50/80 p-4">
+          <div class="mb-2 flex items-center gap-2 text-sm font-extrabold text-amber-800">
+            <span aria-hidden="true">📝</span>
+            <span>Remarks</span>
+          </div>
+          <p class="whitespace-pre-wrap break-words text-sm font-semibold leading-relaxed text-slate-700">${escapeHtml(remarksText)}</p>
+        </div>
+      `;
+    }
+
     function getTransferDisplayId(order) {
       if (String(order.sourceType || '').toUpperCase() === 'OUTLET') {
         return order.routeLabel || order.displayTransferId || `${order.sourceOutletId || 'OUTLET'} -> ${order.destinationOutletId || 'WAREHOUSE'}`;
@@ -163,6 +220,14 @@
       if (!window.SDRSSupabase) return;
       const records = await window.SDRSSupabase.safeCall('[SUPABASE] load driver records', () => window.SDRSSupabase.fetchDeliveryRecords());
       if (!Array.isArray(records)) return;
+      console.log("DRIVER RECORDS:", records);
+      console.log("DRIVER REMARKS LOCATIONS:", records.map(record => ({
+        transferId: record.transferId || record.orderId || record.id || record.outletId,
+        remarks: record.remarks,
+        itemRemarks: getOrderItems(record).map(item => item.remarks).filter(Boolean),
+        metaRemarks: record.meta?.remarks || record.meta?.originalRemarks,
+        rawRemarks: record.raw?.remarks || record.supabaseRow?.remarks
+      })));
       const pendingRecords = records.filter(order => normalizeStatus(order.delivery_status) === 'PENDING_DRIVER');
       const historyRecords = records.filter(order => ['VERIFIED_BY_DRIVER', 'COMPLETED', 'REJECTED'].includes(normalizeStatus(order.delivery_status)));
       const manager = window.SDRSStateManager;
@@ -397,6 +462,7 @@ const orderItems = getOrderItems(order);
               Verified: <span class="live-count" data-order-id="${orderKey}">0</span> / ${totalBoxes}
             </div>
           </div>
+          ${renderRemarksCard(order)}
           <div class="mt-6 flex flex-col sm:flex-row sm:justify-end gap-3">
             <button type="button" data-order-id="${orderKey}" data-ready="false" class="verify-btn w-full sm:w-auto inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-200 px-5 py-3 text-sm font-bold text-slate-500 transition-all cursor-not-allowed" disabled>
               Verify Order

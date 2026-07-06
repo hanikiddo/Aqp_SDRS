@@ -101,6 +101,9 @@
     const transferId = payload.transferId || payload.orderId || row.outlet_id || '';
     const id = transferId || row.outlet_id || '';
     const items = payload.items || payload.xferItems || payload.xfers || [];
+    const preservedRemarks = payload.originalRemarks !== undefined
+      ? payload.originalRemarks
+      : (payload.remarks !== undefined ? payload.remarks : row.remarks);
 
     return {
       ...payload,
@@ -119,13 +122,16 @@
       outletStatus: row.outlet_status || payload.outletStatus,
       outlet_status: row.outlet_status,
       adminReply: row.admin_reply || payload.adminReply,
-      remarks: payload.originalRemarks !== undefined ? payload.originalRemarks : payload.remarks,
+      remarks: preservedRemarks,
+      notes: payload.notes || payload.note || '',
+      meta: payload.meta || payload,
       items,
       xfers: payload.xfers || items,
       xferItems: payload.xferItems || items,
       createdAt: payload.createdAt || row.created_at,
       dbId: row.id,
       supabaseId: row.id,
+      raw: row,
       supabaseRow: row
     };
   }

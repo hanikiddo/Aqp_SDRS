@@ -213,13 +213,21 @@
         const transferId = record.transferId || record.id || record.orderId;
         const orderId = record.orderId || record.transferId || record.id;
         const { id, status, ...recordWithoutId } = record;
+        const originalRemarks = Array.isArray(record.remarks)
+          ? record.remarks.filter(Boolean).join('\n')
+          : (record.remarks || '');
         const remarks = {
           ...recordWithoutId,
           transferId,
+          transfer_id: transferId,
           orderId,
+          outlet: record.destinationOutletName || record.outletName || record.outlet || '',
+          total_boxes: getWarehouseTotalBoxes(record),
+          status: 'PENDING_DRIVER',
+          remarks: originalRemarks,
           items,
           xfers: record.xfers || items,
-          originalRemarks: record.remarks || ''
+          originalRemarks
         };
 
         return {
@@ -417,6 +425,13 @@
         return;
       }
 
+      const warehouseRemarks = xfers
+        .map(item => item.remarks)
+        .filter(Boolean)
+        .join('\n');
+      const remarks = warehouseRemarks;
+      console.log("WAREHOUSE REMARKS VALUE:", remarks);
+
       const order = {
         id: transferID,
         transferId: transferID,
@@ -430,9 +445,10 @@
         driverStatus: 'PENDING_DRIVER',
         outletStatus: 'PENDING_OUTLET',
         timestamps: { createdAt: now.getTime() },
-        remarks: [],
+        remarks,
         adminReplies: []
       };
+      console.log("ORDER PAYLOAD:", order);
 
       if (window.SDRSStateManager) {
         window.SDRSStateManager.appendState('warehouseTransfers', order);
