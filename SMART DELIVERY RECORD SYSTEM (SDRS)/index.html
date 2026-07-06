@@ -7,21 +7,252 @@
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
   <script src="services/app.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    * { font-family: 'Plus Jakarta Sans', sans-serif; }
-    .card-shadow { box-shadow: 0 4px 20px rgba(15, 35, 65, 0.08); }
+    * { font-family: 'Inter', sans-serif; }
+    :root {
+      --primary: #0F4C81;
+      --secondary: #1C75BC;
+      --accent: #00C389;
+      --warning: #F59E0B;
+      --danger: #EF4444;
+      --background: #EEF5FB;
+      --card: rgba(255,255,255,0.82);
+      --border: rgba(255,255,255,0.45);
+      --shadow: 0 20px 40px rgba(0,0,0,0.08);
+    }
+    body {
+      position: relative;
+      overflow-x: hidden;
+      background:
+        linear-gradient(135deg, rgba(238,245,251,0.96), rgba(248,252,255,0.94)),
+        #EEF5FB;
+      color: #102A43;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: -40px;
+      z-index: -3;
+      pointer-events: none;
+      background:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='720' viewBox='0 0 1200 720'%3E%3Cg fill='none' stroke='%230F4C81' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' opacity='.55'%3E%3Cpath d='M72 430h210v-96l-105-70-105 70v96z'/%3E%3Cpath d='M116 430v-68h124v68M143 362v68M176 362v68M209 362v68'/%3E%3Cpath d='M754 414h188l34 42h66v54H754zM802 414v-50h94v50'/%3E%3Ccircle cx='810' cy='514' r='20'/%3E%3Ccircle cx='1000' cy='514' r='20'/%3E%3Cpath d='M422 284h160v174H422zM456 318h92M456 362h92M456 406h92M422 340h160M422 384h160'/%3E%3Cpath d='M694 178c54-28 135-26 188 0 53 26 133 28 190 0M690 226c68 30 131 30 190 0 60-29 122-29 190 0M742 148c18 82 18 137 0 214M1016 148c-18 82-18 137 0 214M690 258h380'/%3E%3Cpath d='M197 252C324 154 487 156 592 262s247 113 368 18' stroke-dasharray='10 18'/%3E%3Cpath d='M592 262l-16-28h32l-16 28zM960 280l-16-28h32l-16 28z'/%3E%3Ccircle cx='197' cy='252' r='8' fill='%2300C389' stroke='none'/%3E%3Ccircle cx='592' cy='262' r='8' fill='%2300C389' stroke='none'/%3E%3Ccircle cx='960' cy='280' r='8' fill='%2300C389' stroke='none'/%3E%3C/g%3E%3C/svg%3E"),
+        linear-gradient(115deg, rgba(15,76,129,0.05) 0 8%, transparent 8% 18%, rgba(28,117,188,0.08) 18% 19%, transparent 19% 36%, rgba(0,195,137,0.07) 36% 37%, transparent 37% 100%),
+        radial-gradient(circle at 14% 20%, rgba(15,76,129,0.26) 0 2px, transparent 3px),
+        radial-gradient(circle at 36% 52%, rgba(0,195,137,0.28) 0 2px, transparent 3px),
+        radial-gradient(circle at 74% 28%, rgba(28,117,188,0.28) 0 2px, transparent 3px),
+        radial-gradient(circle at 84% 74%, rgba(15,76,129,0.24) 0 2px, transparent 3px),
+        linear-gradient(90deg, rgba(15,76,129,0.06) 1px, transparent 1px),
+        linear-gradient(0deg, rgba(28,117,188,0.05) 1px, transparent 1px);
+      background-size: 900px 520px, 260px 220px, 300px 260px, 360px 280px, 280px 240px, 72px 72px, 72px 72px;
+      filter: blur(30px);
+      opacity: 0.18;
+      transform: scale(1.06);
+    }
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -2;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 20% 12%, rgba(28,117,188,0.16), transparent 28rem),
+        radial-gradient(circle at 92% 4%, rgba(0,195,137,0.12), transparent 24rem),
+        rgba(255,255,255,0.62);
+      backdrop-filter: blur(1px);
+    }
+    .glass-panel {
+      background: rgba(255,255,255,0.78);
+      border: 1px solid rgba(255,255,255,0.62);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(22px);
+    }
+    .soft-card {
+      position: relative;
+      overflow: hidden;
+      background: var(--card);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+    .soft-card::before,
+    .module-card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(135deg, rgba(255,255,255,0.42), transparent 34%);
+      opacity: 0.72;
+    }
+    .card-shadow { box-shadow: var(--shadow); }
+    .sidebar-shell {
+      background: linear-gradient(165deg, #07335c 0%, #0F4C81 48%, #0a2b4b 100%);
+      box-shadow: 20px 0 50px rgba(15,76,129,0.16);
+    }
+    .sidebar-link {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      border-radius: 1rem;
+      padding: 0.72rem 0.85rem;
+      color: rgba(255,255,255,0.76);
+      font-size: 0.875rem;
+      font-weight: 700;
+      transition: all 300ms ease;
+    }
+    .sidebar-link:hover,
+    .sidebar-link.active {
+      color: #fff;
+      background: rgba(255,255,255,0.14);
+      transform: translateX(3px);
+    }
+    .stat-card,
+    .module-card,
+    .analytics-card {
+      transition: transform 300ms ease, box-shadow 300ms ease, border-color 300ms ease;
+    }
+    .module-card {
+      min-height: 270px;
+      border-radius: 28px;
+    }
+    .module-card:hover,
+    .stat-card:hover,
+    .analytics-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 26px 52px rgba(15,76,129,0.13);
+      border-color: rgba(28,117,188,0.26);
+    }
+    .illustration-panel {
+      background:
+        radial-gradient(circle at 80% 18%, rgba(0,195,137,0.18), transparent 3rem),
+        linear-gradient(135deg, rgba(28,117,188,0.12), rgba(255,255,255,0.62));
+    }
+    .module-tip {
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 300ms ease, transform 300ms ease;
+      pointer-events: none;
+    }
+    .group:hover .module-tip,
+    .group:focus-within .module-tip {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .ripple-btn {
+      position: relative;
+      overflow: hidden;
+    }
+    .ripple-btn::after {
+      content: "";
+      position: absolute;
+      inset: auto;
+      width: 8rem;
+      height: 8rem;
+      left: var(--x, 50%);
+      top: var(--y, 50%);
+      transform: translate(-50%, -50%) scale(0);
+      border-radius: 999px;
+      background: rgba(255,255,255,0.32);
+      transition: transform 300ms ease;
+      pointer-events: none;
+    }
+    .ripple-btn:hover::after { transform: translate(-50%, -50%) scale(1); }
+    .donut-ring {
+      background:
+        conic-gradient(#00C389 0 48%, #F59E0B 48% 72%, #1C75BC 72% 92%, #EF4444 92% 100%);
+    }
+    .history-row {
+      display: grid;
+      grid-template-columns: minmax(7rem, 1fr) minmax(8rem, 1.2fr) minmax(7rem, auto) minmax(4rem, auto);
+      gap: 0.75rem;
+      align-items: center;
+      padding: 0.85rem 0;
+      border-bottom: 1px solid rgba(226,232,240,0.7);
+    }
+    .history-row:last-child { border-bottom: 0; }
+    .activity-item {
+      position: relative;
+      padding-left: 1.6rem;
+      padding-bottom: 1rem;
+    }
+    .activity-item::before {
+      content: "";
+      position: absolute;
+      left: 0.37rem;
+      top: 0.45rem;
+      bottom: -0.2rem;
+      width: 1px;
+      background: rgba(148,163,184,0.35);
+    }
+    .activity-item:last-child { padding-bottom: 0; }
+    .activity-item:last-child::before { display: none; }
+    .activity-dot {
+      position: absolute;
+      left: 0;
+      top: 0.35rem;
+      width: 0.78rem;
+      height: 0.78rem;
+      border-radius: 999px;
+      background: #1C75BC;
+      box-shadow: 0 0 0 4px rgba(28,117,188,0.1);
+    }
+    .status-chip {
+      display: inline-flex;
+      align-items: center;
+      width: max-content;
+      border-radius: 999px;
+      padding: 0.35rem 0.65rem;
+      font-size: 0.68rem;
+      font-weight: 800;
+      line-height: 1;
+      white-space: nowrap;
+    }
+    .status-chip.completed { background: #ecfdf5; color: #047857; }
+    .status-chip.pending-driver { background: #fffbeb; color: #b45309; }
+    .status-chip.pending-outlet { background: #eff6ff; color: #1d4ed8; }
+    .status-chip.issues { background: #fef2f2; color: #b91c1c; }
+    .status-chip.default { background: #f1f5f9; color: #475569; }
+    @media (max-width: 640px) {
+      .history-row {
+        grid-template-columns: 1fr;
+        gap: 0.35rem;
+      }
+    }
     @keyframes fadeUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
     .fade-up { animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
     .delay-1 { animation-delay: 0.1s; }
     .delay-2 { animation-delay: 0.2s; }
     .delay-3 { animation-delay: 0.3s; }
-    /* Simulate loading state on click */
     .btn-loading { pointer-events: none; opacity: 0.8; }
     .btn-loading .icon-default { display: none; }
     .btn-loading .icon-spinner { display: inline-block; animation: spin 1s linear infinite; }
     @keyframes spin { 100% { transform: rotate(360deg); } }
     .icon-spinner { display: none; }
+    .system-status-badge {
+      border: 1px solid transparent;
+      transition: background-color 300ms ease, border-color 300ms ease, color 300ms ease;
+    }
+    .system-status-badge .status-dot {
+      transition: background-color 300ms ease;
+    }
+    .system-status-badge.status-online {
+      background: #ecfdf5;
+      border-color: #d1fae5;
+      color: #047857;
+    }
+    .system-status-badge.status-offline {
+      background: #fef2f2;
+      border-color: #fee2e2;
+      color: #b91c1c;
+    }
+    .system-status-badge.status-sync-issue {
+      background: #fffbeb;
+      border-color: #fde68a;
+      color: #b45309;
+    }
+    .system-status-badge.status-online .status-dot { background: #10b981; }
+    .system-status-badge.status-offline .status-dot { background: #ef4444; }
+    .system-status-badge.status-sync-issue .status-dot { background: #f59e0b; }
   </style>
   <script>
     tailwind.config = {
@@ -43,85 +274,176 @@
     }
   </script>
  </head>
- <body class="bg-corporate-50 min-h-screen flex flex-col text-slate-800">
+ <body class="min-h-screen text-slate-800">
 
-  <!-- Top Header Navigation -->
-  <header class="bg-white border-b border-slate-200 sticky top-0 z-50">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <img src="assets/logo.jpg" alt="Farmasi Al Qanaah Logo" class="w-12 h-12 rounded-full shadow-md object-cover border-2 border-white" />
-        <div>
-          <h1 class="text-xl font-extrabold text-navy tracking-tight leading-none">Farmasi Al Qanaah</h1>
-          <p class="text-[10px] uppercase font-bold text-teal tracking-widest leading-none mt-1">Global Operations</p>
-        </div>
+  <!-- Fixed Sidebar -->
+  <aside class="sidebar-shell fixed left-4 top-4 bottom-4 z-40 hidden w-[260px] rounded-[2rem] p-4 lg:flex flex-col">
+    <div class="flex items-center gap-3 px-2 pb-6 pt-2">
+      <img src="assets/logo.jpg" alt="Farmasi Al Qanaah Logo" class="w-11 h-11 rounded-2xl object-cover border border-white/30 shadow-lg" />
+      <div>
+        <h1 class="text-sm font-extrabold text-white leading-tight">Farmasi Al Qanaah</h1>
+        <p class="text-[10px] uppercase font-bold tracking-[0.18em] text-white/55 mt-1">SDRS Enterprise</p>
       </div>
     </div>
-  </header>
 
-  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col">
+    <nav class="flex-1 space-y-5 overflow-visible pr-0">
+      <div class="space-y-2">
+        <a href="index.html" class="sidebar-link active">
+          <i data-lucide="layout-dashboard" style="width:18px;height:18px;"></i>
+          Dashboard
+        </a>
+      </div>
+      <div>
+        <p class="px-3 pb-2 text-[10px] font-extrabold uppercase tracking-[0.2em] text-white/42">Operations</p>
+        <div class="space-y-1">
+          <a href="warehouse/index.html" class="sidebar-link"><i data-lucide="factory" style="width:18px;height:18px;"></i>Warehouse Node</a>
+          <a href="driver/index.html" class="sidebar-link"><i data-lucide="truck" style="width:18px;height:18px;"></i>Driver Console</a>
+          <a href="outlet/select-outlet.html" class="sidebar-link"><i data-lucide="store" style="width:18px;height:18px;"></i>Outlet Receiver</a>
+          <a href="outlet-sender/index.html" class="sidebar-link"><i data-lucide="send" style="width:18px;height:18px;"></i>Outlet Sender</a>
+        </div>
+      </div>
+      <div>
+        <p class="px-3 pb-2 text-[10px] font-extrabold uppercase tracking-[0.2em] text-white/42">Management</p>
+        <div class="space-y-1">
+          <a href="admin/index.html" class="sidebar-link"><i data-lucide="monitor" style="width:18px;height:18px;"></i>Admin Dashboard</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="mt-5 rounded-[1.5rem] border border-white/15 bg-white/10 p-4 text-white shadow-lg">
+      <div class="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-white/14">
+        <i data-lucide="shield-check" style="width:21px;height:21px;"></i>
+      </div>
+      <p class="text-sm font-extrabold">Secure Enterprise System</p>
+      <p class="mt-1 text-xs font-semibold text-white/58">256-bit Encryption</p>
+    </div>
+  </aside>
+
+  <main class="min-h-screen lg:pl-[292px]">
+    <div class="mx-auto flex w-full max-w-[1560px] flex-col px-4 py-4 sm:px-6 lg:px-8">
+
+    <!-- Sticky Glass Header -->
+    <header class="sticky top-4 z-30 mb-6">
+      <div class="glass-panel h-auto rounded-[1.75rem] px-4 py-3 sm:px-5 flex flex-col gap-3 md:h-16 md:flex-row md:items-center md:justify-between">
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center gap-3 lg:hidden">
+            <img src="assets/logo.jpg" alt="Farmasi Al Qanaah Logo" class="w-10 h-10 rounded-2xl shadow-sm object-cover border border-white" />
+            <div>
+              <h1 class="text-base font-extrabold text-navy tracking-tight leading-none">Farmasi Al Qanaah</h1>
+              <p class="text-[10px] uppercase font-bold text-teal tracking-widest leading-none mt-1">SDRS Operations</p>
+            </div>
+          </div>
+          <div class="hidden lg:flex items-center gap-3">
+            <button type="button" class="h-10 w-10 rounded-2xl border border-white/70 bg-white/70 text-[#0F4C81] flex items-center justify-center shadow-sm">
+              <i data-lucide="panel-left" style="width:18px;height:18px;"></i>
+            </button>
+          </div>
+          <div id="system-status-badge" class="system-status-badge status-online inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-bold">
+            <span id="system-status-dot" class="status-dot w-2 h-2 rounded-full animate-pulse"></span>
+            <span id="system-status-text">System Online</span>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center justify-end gap-2 sm:gap-3 text-sm">
+          <div class="rounded-full bg-white/70 border border-white/70 px-3 py-2 text-xs font-semibold text-slate-600">Jul 03, 2026</div>
+        </div>
+      </div>
+    </header>
     
     <!-- Title & Presentation -->
-    <div class="mb-10 fade-up">
-      <div class="flex items-center justify-between flex-wrap gap-4 mb-2">
-        <h2 class="text-3xl md:text-4xl font-extrabold text-navy tracking-tight">Smart Delivery Record System</h2>
-        <div class="inline-flex items-center gap-2 bg-green-50 text-green-700 px-3 py-1 rounded-md text-sm font-bold border border-green-200 shadow-sm">
-          <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> System Online
+    <section class="mb-7 fade-up">
+      <div class="glass-panel rounded-[2rem] p-6 sm:p-8">
+        <div class="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+          <div>
+            <div class="inline-flex w-fit items-center gap-2 rounded-full bg-[#E8F6F8] px-3 py-1.5 text-xs font-bold text-[#0F4C81]">
+              <i data-lucide="activity" style="width:14px;height:14px;"></i>
+              Enterprise Logistics Control
+            </div>
+            <h2 class="mt-4 text-3xl md:text-5xl font-extrabold text-navy tracking-tight">Smart Delivery Record System</h2>
+            <p class="mt-2 text-slate-500 text-base md:text-lg font-medium">Real-time delivery pipeline monitoring and management system</p>
+          </div>
+          <div class="grid grid-cols-3 gap-3 text-center">
+            <div class="rounded-2xl border border-white/60 bg-white/62 px-4 py-3">
+              <p class="text-lg font-extrabold text-[#0F4C81]">24/7</p>
+              <p class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Monitor</p>
+            </div>
+            <div class="rounded-2xl border border-white/60 bg-white/62 px-4 py-3">
+              <p class="text-lg font-extrabold text-[#00C389]">Live</p>
+              <p class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Sync</p>
+            </div>
+            <div class="rounded-2xl border border-white/60 bg-white/62 px-4 py-3">
+              <p class="text-lg font-extrabold text-[#1C75BC]">AQP</p>
+              <p class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Network</p>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </section>
 
     <!-- Quick Stats -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10 fade-up delay-1">
+    <section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 mb-8 fade-up delay-1">
       <!-- Stat 1 -->
-      <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col">
-        <div class="flex items-center gap-2 mb-2">
-            <i data-lucide="package" class="text-teal" style="width:18px;height:18px;"></i>
-            <span class="text-sm font-semibold text-slate-500">Total Orders</span>
+      <div class="stat-card soft-card rounded-[1.75rem] p-5">
+        <div class="relative flex items-start justify-between">
+            <div><span class="text-sm font-extrabold text-slate-500">Total Orders</span><p class="mt-1 text-xs font-semibold text-slate-400">All active records</p></div>
+            <span class="w-12 h-12 rounded-2xl bg-[#EAF3FB] text-[#0F4C81] flex items-center justify-center"><i data-lucide="package" style="width:22px;height:22px;"></i></span>
         </div>
-        <span id="stat-total" class="text-3xl font-extrabold text-navy">-</span>
+        <span id="stat-total" class="relative mt-6 block text-4xl font-extrabold text-navy">-</span>
       </div>
       <!-- Stat 2 -->
-      <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col">
-        <div class="flex items-center gap-2 mb-2">
-            <i data-lucide="truck" class="text-indigo-500" style="width:18px;height:18px;"></i>
-            <span class="text-sm font-semibold text-slate-500">Pending Driver</span>
+      <div class="stat-card soft-card rounded-[1.75rem] p-5">
+        <div class="relative flex items-start justify-between">
+            <div><span class="text-sm font-extrabold text-slate-500">Pending Driver</span><p class="mt-1 text-xs font-semibold text-slate-400">Awaiting pickup</p></div>
+            <span class="w-12 h-12 rounded-2xl bg-orange-50 text-[#F59E0B] flex items-center justify-center"><i data-lucide="truck" style="width:22px;height:22px;"></i></span>
         </div>
-        <span id="stat-driver-pending" class="text-3xl font-extrabold text-navy">-</span>
+        <span id="stat-driver-pending" class="relative mt-6 block text-4xl font-extrabold text-navy">-</span>
       </div>
       <!-- Stat 3 -->
-      <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col">
-        <div class="flex items-center gap-2 mb-2">
-            <i data-lucide="store" class="text-orange-500" style="width:18px;height:18px;"></i>
-            <span class="text-sm font-semibold text-slate-500">Pending Outlet</span>
+      <div class="stat-card soft-card rounded-[1.75rem] p-5">
+        <div class="relative flex items-start justify-between">
+            <div><span class="text-sm font-extrabold text-slate-500">Pending Outlet</span><p class="mt-1 text-xs font-semibold text-slate-400">Awaiting receiver</p></div>
+            <span class="w-12 h-12 rounded-2xl bg-orange-50 text-[#F59E0B] flex items-center justify-center"><i data-lucide="store" style="width:22px;height:22px;"></i></span>
         </div>
-        <span id="stat-outlet-pending" class="text-3xl font-extrabold text-navy">-</span>
+        <span id="stat-outlet-pending" class="relative mt-6 block text-4xl font-extrabold text-navy">-</span>
       </div>
       <!-- Stat 4 -->
-      <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col">
-        <div class="flex items-center gap-2 mb-2">
-            <i data-lucide="check-circle" class="text-green-500" style="width:18px;height:18px;"></i>
-            <span class="text-sm font-semibold text-slate-500">Completed Full</span>
+      <div class="stat-card soft-card rounded-[1.75rem] p-5">
+        <div class="relative flex items-start justify-between">
+            <div><span class="text-sm font-extrabold text-slate-500">Completed</span><p class="mt-1 text-xs font-semibold text-slate-400">Confirmed delivery</p></div>
+            <span class="w-12 h-12 rounded-2xl bg-emerald-50 text-[#00C389] flex items-center justify-center"><i data-lucide="check-circle" style="width:22px;height:22px;"></i></span>
         </div>
-        <span id="stat-completed" class="text-3xl font-extrabold text-navy">-</span>
+        <span id="stat-completed" class="relative mt-6 block text-4xl font-extrabold text-navy">-</span>
       </div>
-    </div>
+      <!-- Stat 5 -->
+      <div class="stat-card soft-card rounded-[1.75rem] p-5 sm:col-span-2 xl:col-span-1">
+        <div class="relative flex items-start justify-between">
+            <div><span class="text-sm font-extrabold text-slate-500">Issues</span><p class="mt-1 text-xs font-semibold text-slate-400">Reported mismatch</p></div>
+            <span class="w-12 h-12 rounded-2xl bg-red-50 text-[#EF4444] flex items-center justify-center"><i data-lucide="alert-triangle" style="width:22px;height:22px;"></i></span>
+        </div>
+        <span id="stat-issues" class="relative mt-6 block text-4xl font-extrabold text-navy">-</span>
+      </div>
+    </section>
 
     <!-- Modules Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 fade-up delay-2">
+    <div class="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between fade-up delay-2">
+      <div>
+        <h3 class="text-xl font-extrabold text-navy">Operations Modules</h3>
+        <p class="text-sm font-medium text-slate-500">Access the pharmacy supply chain workspaces.</p>
+      </div>
+      <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-[#1C75BC]">Live modules</p>
+    </div>
+    <section class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 fade-up delay-2">
       
       <!-- Warehouse Module -->
-      <div class="group flex flex-col bg-white border border-slate-200 rounded-2xl overflow-hidden card-shadow hover:shadow-lg hover:border-amber-500/50 hover:-translate-y-1 transition-all duration-300">
-        <!-- Decoration indicating warehouse styling -->
-        <div class="bg-slate-50 h-32 flex items-center justify-center border-b border-slate-100 relative overflow-hidden group-hover:bg-amber-50 transition-colors">
-            <i data-lucide="factory" class="text-amber-500 relative z-10" style="width:40px;height:40px;"></i>
+      <div class="module-card group relative soft-card p-5">
+        <div class="relative illustration-panel mb-5 h-28 rounded-[1.4rem] border border-white/70 p-4">
+            <i data-lucide="factory" class="text-[#0F4C81]" style="width:34px;height:34px;"></i>
+            <i data-lucide="package" class="absolute bottom-4 right-5 text-[#F59E0B]" style="width:30px;height:30px;"></i>
         </div>
-        <div class="p-6 flex-1 flex flex-col">
-            <div class="flex items-center gap-2 mb-3">
-                <span class="bg-amber-50 text-amber-600 text-xs font-bold px-2 py-1 rounded">Logistics Root</span>
-            </div>
-            <h2 class="text-lg font-extrabold text-navy mb-2">Warehouse Node</h2>
-            <p class="text-slate-500 text-sm mb-6 flex-1">Create and assign new Transfer Orders (XFER) to logistics staff.</p>
-            <a href="warehouse/index.html" onclick="handleLoad(this)" class="inline-flex items-center justify-center gap-2 bg-white border-2 border-slate-200 hover:border-amber-500 hover:text-amber-700 text-navy font-bold py-2 px-4 rounded-xl transition-colors w-full group/btn text-sm">
+        <h2 class="relative text-lg font-extrabold text-navy">Warehouse Node</h2>
+        <p class="relative mt-1 text-sm font-semibold text-slate-500">Create delivery transfer</p>
+        <div class="module-tip absolute left-5 right-5 top-32 rounded-2xl bg-white/95 border border-slate-200 p-3 text-xs font-medium text-slate-600 shadow-lg">Create delivery transfer</div>
+        <div class="relative mt-6">
+            <a href="warehouse/index.html" onclick="handleLoad(this)" class="ripple-btn inline-flex items-center justify-center gap-2 bg-white border border-slate-200 hover:border-[#F59E0B] hover:text-[#0F4C81] text-navy font-bold py-3 px-4 rounded-2xl transition-colors w-full group/btn text-sm">
                 <i data-lucide="external-link" class="icon-default group-hover/btn:scale-110 transition-transform" style="width:16px;height:16px;"></i>
                 <i data-lucide="loader-2" class="icon-spinner" style="width:16px;height:16px;"></i>
                 <span class="btn-text">Access Module</span>
@@ -130,22 +452,16 @@
       </div>
 
       <!-- Driver Module -->
-      <div class="group flex flex-col bg-white border border-slate-200 rounded-2xl overflow-hidden card-shadow hover:shadow-lg hover:border-teal/50 hover:-translate-y-1 transition-all duration-300">
-        <!-- Decoration indicating mobile styling -->
-        <div class="bg-slate-50 h-32 flex items-center justify-center border-b border-slate-100 relative overflow-hidden group-hover:bg-teal-light/70 transition-colors">
-            <div class="w-16 h-32 bg-white rounded-t-xl border-t border-l border-r border-slate-300 shadow-sm absolute bottom-0 translate-y-4 flex flex-col justify-between p-1">
-                <div class="w-6 h-1 bg-slate-200 mx-auto rounded-full"></div>
-                <div class="w-full h-20 bg-slate-50 rounded bg-teal-light border border-teal/20"></div>
-            </div>
-            <i data-lucide="smartphone" class="text-teal relative z-10" style="width:40px;height:40px;"></i>
+      <div class="module-card group relative soft-card p-5">
+        <div class="relative illustration-panel mb-5 h-28 rounded-[1.4rem] border border-white/70 p-4">
+            <i data-lucide="smartphone" class="text-[#0F4C81]" style="width:34px;height:34px;"></i>
+            <i data-lucide="truck" class="absolute bottom-4 right-5 text-[#00C389]" style="width:32px;height:32px;"></i>
         </div>
-        <div class="p-6 flex-1 flex flex-col">
-            <div class="flex items-center gap-2 mb-3">
-                <span class="bg-teal-light text-teal text-xs font-bold px-2 py-1 rounded">Field Operations</span>
-            </div>
-            <h2 class="text-lg font-extrabold text-navy mb-2">Driver Console</h2>
-            <p class="text-slate-500 text-sm mb-6 flex-1">Mobile interface for drivers to verify XFER orders in real time.</p>
-            <a href="driver/index.html" onclick="handleLoad(this)" class="inline-flex items-center justify-center gap-2 bg-white border-2 border-slate-200 hover:border-teal hover:text-teal text-navy font-bold py-2 px-4 rounded-xl transition-colors w-full group/btn text-sm">
+        <h2 class="relative text-lg font-extrabold text-navy">Driver Console</h2>
+        <p class="relative mt-1 text-sm font-semibold text-slate-500">Verify assigned deliveries</p>
+        <div class="module-tip absolute left-5 right-5 top-32 rounded-2xl bg-white/95 border border-slate-200 p-3 text-xs font-medium text-slate-600 shadow-lg">Verify assigned deliveries</div>
+        <div class="relative mt-6">
+            <a href="driver/index.html" onclick="handleLoad(this)" class="ripple-btn inline-flex items-center justify-center gap-2 bg-white border border-slate-200 hover:border-[#00C389] hover:text-[#0F4C81] text-navy font-bold py-3 px-4 rounded-2xl transition-colors w-full group/btn text-sm">
                 <i data-lucide="external-link" class="icon-default group-hover/btn:scale-110 transition-transform" style="width:16px;height:16px;"></i>
                 <i data-lucide="loader-2" class="icon-spinner" style="width:16px;height:16px;"></i>
                 <span class="btn-text">Access Module</span>
@@ -154,18 +470,16 @@
       </div>
       
       <!-- Outlet Module -->
-      <div class="group flex flex-col bg-white border border-slate-200 rounded-2xl overflow-hidden card-shadow hover:shadow-lg hover:border-purple-500/50 hover:-translate-y-1 transition-all duration-300">
-        <!-- Decoration indicating outlet styling -->
-        <div class="bg-slate-50 h-32 flex items-center justify-center border-b border-slate-100 relative overflow-hidden group-hover:bg-purple-50 transition-colors">
-            <i data-lucide="store" class="text-purple-500 relative z-10" style="width:40px;height:40px;"></i>
+      <div class="module-card group relative soft-card p-5">
+        <div class="relative illustration-panel mb-5 h-28 rounded-[1.4rem] border border-white/70 p-4">
+            <i data-lucide="store" class="text-[#0F4C81]" style="width:34px;height:34px;"></i>
+            <i data-lucide="check-circle" class="absolute bottom-4 right-5 text-[#1C75BC]" style="width:30px;height:30px;"></i>
         </div>
-        <div class="p-6 flex-1 flex flex-col">
-            <div class="flex items-center gap-2 mb-3">
-                <span class="bg-purple-50 text-purple-600 text-xs font-bold px-2 py-1 rounded">End Fulfillment</span>
-            </div>
-            <h2 class="text-lg font-extrabold text-navy mb-2">Outlet Receiver</h2>
-            <p class="text-slate-500 text-sm mb-6 flex-1">Check and acknowledge inventory deliveries by local branch team.</p>
-            <a href="outlet/select-outlet.html" onclick="handleLoad(this)" class="inline-flex items-center justify-center gap-2 bg-white border-2 border-slate-200 hover:border-purple-500 hover:text-purple-700 text-navy font-bold py-2 px-4 rounded-xl transition-colors w-full group/btn text-sm">
+        <h2 class="relative text-lg font-extrabold text-navy">Outlet Receiver</h2>
+        <p class="relative mt-1 text-sm font-semibold text-slate-500">Confirm received items</p>
+        <div class="module-tip absolute left-5 right-5 top-32 rounded-2xl bg-white/95 border border-slate-200 p-3 text-xs font-medium text-slate-600 shadow-lg">Confirm received items</div>
+        <div class="relative mt-6">
+            <a href="outlet/select-outlet.html" onclick="handleLoad(this)" class="ripple-btn inline-flex items-center justify-center gap-2 bg-white border border-slate-200 hover:border-[#1C75BC] hover:text-[#0F4C81] text-navy font-bold py-3 px-4 rounded-2xl transition-colors w-full group/btn text-sm">
                 <i data-lucide="external-link" class="icon-default group-hover/btn:scale-110 transition-transform" style="width:16px;height:16px;"></i>
                 <i data-lucide="loader-2" class="icon-spinner" style="width:16px;height:16px;"></i>
                 <span class="btn-text">Access Module</span>
@@ -174,65 +488,62 @@
       </div>
 
       <!-- Outlet Sender Module -->
-      <div class="group flex flex-col bg-white border border-slate-200 rounded-2xl overflow-hidden card-shadow hover:shadow-lg hover:border-sky-500/50 hover:-translate-y-1 transition-all duration-300">
-        <!-- Decoration indicating outlet transfer styling -->
-        <div class="bg-slate-50 h-32 flex items-center justify-center border-b border-slate-100 relative overflow-hidden group-hover:bg-sky-50 transition-colors">
-            <i data-lucide="send" class="text-sky-500 relative z-10" style="width:40px;height:40px;"></i>
+      <div class="module-card group relative soft-card p-5">
+        <div class="relative illustration-panel mb-5 h-28 rounded-[1.4rem] border border-white/70 p-4">
+            <i data-lucide="send" class="text-[#0F4C81]" style="width:34px;height:34px;"></i>
+            <i data-lucide="package-check" class="absolute bottom-4 right-5 text-[#1C75BC]" style="width:30px;height:30px;"></i>
         </div>
-        <div class="p-6 flex-1 flex flex-col">
-            <div class="flex items-center gap-2 mb-3">
-                <span class="bg-sky-50 text-sky-600 text-xs font-bold px-2 py-1 rounded">Outlet Transfer</span>
-            </div>
-            <h2 class="text-lg font-extrabold text-navy mb-2">Outlet Sender</h2>
-            <p class="text-slate-500 text-sm mb-6 flex-1">Create transfer requests from outlet to outlet or warehouse.</p>
-            <a href="outlet-sender/index.html" onclick="handleLoad(this)" class="inline-flex items-center justify-center gap-2 bg-white border-2 border-slate-200 hover:border-sky-500 hover:text-sky-700 text-navy font-bold py-2 px-4 rounded-xl transition-colors w-full group/btn text-sm">
+        <h2 class="relative text-lg font-extrabold text-navy">Outlet Sender</h2>
+        <p class="relative mt-1 text-sm font-semibold text-slate-500">Create outlet request</p>
+        <div class="module-tip absolute left-5 right-5 top-32 rounded-2xl bg-white/95 border border-slate-200 p-3 text-xs font-medium text-slate-600 shadow-lg">Create outlet request</div>
+        <div class="relative mt-6">
+            <a href="outlet-sender/index.html" onclick="handleLoad(this)" class="ripple-btn inline-flex items-center justify-center gap-2 bg-white border border-slate-200 hover:border-[#1C75BC] hover:text-[#0F4C81] text-navy font-bold py-3 px-4 rounded-2xl transition-colors w-full group/btn text-sm">
                 <i data-lucide="external-link" class="icon-default group-hover/btn:scale-110 transition-transform" style="width:16px;height:16px;"></i>
                 <i data-lucide="loader-2" class="icon-spinner" style="width:16px;height:16px;"></i>
                 <span class="btn-text">Access Module</span>
             </a>
         </div>
       </div>
+    </section>
 
-      <!-- Admin Module -->
-      <div class="group flex flex-col bg-white border border-slate-200 rounded-2xl overflow-hidden card-shadow hover:shadow-lg hover:border-navy/40 hover:-translate-y-1 transition-all duration-300">
-        <!-- Decoration indicating desktop dashboard styling -->
-        <div class="bg-slate-100 h-32 flex items-center justify-center border-b border-slate-100 relative overflow-hidden group-hover:bg-navy/5 transition-colors">
-            <div class="w-32 h-20 bg-white rounded-md border border-slate-300 shadow-sm relative z-10 flex flex-col overflow-hidden">
-                <div class="h-3 border-b border-slate-200 bg-slate-50 flex items-center px-1 gap-1">
-                    <div class="w-1.5 h-1.5 rounded-full bg-slate-300"></div>
-                </div>
-                <div class="flex-1 p-2 flex gap-2 w-full">
-                    <div class="w-4 h-full bg-slate-100 rounded-sm"></div>
-                    <div class="flex-1 h-full flex flex-col gap-1 rounded-sm">
-                        <div class="h-4 bg-slate-50 rounded-sm w-full"></div>
-                        <div class="flex-1 bg-navy/5 rounded-sm w-full"></div>
-                    </div>
-                </div>
-            </div>
-            <i data-lucide="layout-dashboard" class="text-navy absolute z-20 bg-white/40 backdrop-blur-sm rounded-lg p-1" style="width:32px;height:32px;"></i>
+    <section class="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-10 fade-up delay-3">
+      <div class="analytics-card soft-card rounded-[1.75rem] p-6">
+        <div class="relative flex items-center justify-between gap-4">
+          <div>
+            <h3 class="text-lg font-extrabold text-navy">Latest Delivery History</h3>
+            <p class="text-sm font-medium text-slate-500 mt-1">Recent delivery records</p>
+          </div>
+          <span class="w-11 h-11 rounded-2xl bg-[#EAF3FB] text-[#0F4C81] flex items-center justify-center"><i data-lucide="history" style="width:22px;height:22px;"></i></span>
         </div>
-        <div class="p-6 flex-1 flex flex-col">
-            <div class="flex items-center gap-2 mb-3">
-                <span class="bg-indigo-50 text-indigo-700 text-xs font-bold px-2 py-1 rounded">Control Center</span>
-            </div>
-            <h2 class="text-lg font-extrabold text-navy mb-2">Admin Dash</h2>
-            <p class="text-slate-500 text-sm mb-6 flex-1">Centralized monitoring of all pipelines and lifecycle statuses.</p>
-            <button onclick="handleAdminAccess(this)" class="inline-flex items-center justify-center gap-2 bg-navy hover:bg-navy/90 text-white font-bold py-2 px-4 rounded-xl transition-colors w-full shadow-md group/btn text-sm">
-                <i data-lucide="external-link" class="icon-default group-hover/btn:scale-110 transition-transform" style="width:16px;height:16px;"></i>
-                <i data-lucide="loader-2" class="icon-spinner" style="width:16px;height:16px;"></i>
-                <span class="btn-text">Access Module</span>
-            </button>
+        <div class="relative mt-5">
+          <div class="hidden sm:grid grid-cols-[minmax(7rem,1fr)_minmax(8rem,1.2fr)_minmax(7rem,auto)_minmax(4rem,auto)] gap-3 border-b border-slate-200/70 pb-3 text-[11px] font-extrabold uppercase tracking-wide text-slate-400">
+            <span>Transfer ID</span>
+            <span>Outlet</span>
+            <span>Status</span>
+            <span>Time</span>
+          </div>
+          <div id="latest-delivery-list" class="min-h-[9rem]"></div>
         </div>
       </div>
 
-    </div>
+      <div class="analytics-card soft-card rounded-[1.75rem] p-6">
+        <div class="relative flex items-center justify-between gap-4">
+          <div>
+            <h3 class="text-lg font-extrabold text-navy">Live Activity</h3>
+            <p class="text-sm font-medium text-slate-500 mt-1">Recent system movement</p>
+          </div>
+          <span class="w-11 h-11 rounded-2xl bg-emerald-50 text-[#00C389] flex items-center justify-center"><i data-lucide="activity" style="width:22px;height:22px;"></i></span>
+        </div>
+        <div id="live-activity-list" class="relative mt-6 min-h-[9rem]"></div>
+      </div>
+    </section>
 
     <!-- Trust Footer -->
     <footer class="mt-auto pt-10 pb-4 fade-up delay-3">
-      <div class="border-t border-slate-200 pt-6 flex flex-col md:flex-row items-center justify-between text-xs text-slate-400 font-semibold gap-4">
+      <div class="border-t border-white/60 pt-6 flex flex-col md:flex-row items-center justify-between text-xs text-slate-400 font-semibold gap-4">
         <div class="flex items-center gap-2 text-slate-500">
-            <i data-lucide="shield-check" style="width:16px;height:16px;color:#10b981;"></i>
-            <span>Secure Enterprise System • 256-bit Encryption Active</span>
+            <i data-lucide="shield-check" style="width:16px;height:16px;color:#00C389;"></i>
+            <span>Secure Enterprise System - 256-bit Encryption Active</span>
         </div>
         <div>
             &copy; 2026 Farmasi Al Qanaah SDRS. Authorized Access Only.
@@ -240,6 +551,7 @@
       </div>
     </footer>
 
+    </div>
   </main>
 
   <script src="shared/state.js"></script>
@@ -302,6 +614,49 @@
           setTimeout(() => {
               window.location.href = 'admin/index.html';
           }, 400);
+      }
+
+      function setSystemStatus(status) {
+          const badge = document.getElementById('system-status-badge');
+          const text = document.getElementById('system-status-text');
+          if (!badge || !text) return;
+
+          const states = {
+              online: { label: 'System Online', className: 'status-online' },
+              offline: { label: 'No Internet', className: 'status-offline' },
+              syncIssue: { label: 'Sync Issue', className: 'status-sync-issue' }
+          };
+          const nextState = states[status] || states.online;
+
+          badge.classList.remove('status-online', 'status-offline', 'status-sync-issue');
+          badge.classList.add(nextState.className);
+          text.textContent = nextState.label;
+      }
+
+      async function refreshSystemStatus() {
+          if (!navigator.onLine) {
+              setSystemStatus('offline');
+              return false;
+          }
+
+          if (!window.SDRSSupabase || typeof window.SDRSSupabase.fetchDeliveryRecords !== 'function') {
+              setSystemStatus('syncIssue');
+              return false;
+          }
+
+          try {
+              const records = await window.SDRSSupabase.fetchDeliveryRecords();
+              if (Array.isArray(records)) {
+                  setSystemStatus('online');
+                  return true;
+              }
+              setSystemStatus('syncIssue');
+              return false;
+          } catch (err) {
+              console.warn('[SDRS] Supabase sync status check failed', err);
+              setSystemStatus('syncIssue');
+              return false;
+          }
       }
 
       const SDRSStorageManager = {
@@ -373,9 +728,20 @@
 
       async function syncDashboardStats() {
           console.debug('[SDRS] syncDashboardStats start');
-          const result = (typeof window.loadDashboardStats === 'function')
-              ? await window.loadDashboardStats()
-              : { stats: window.SDRSStats.calculateDashboardStats(SDRSStorageManager.getAllOrders()) };
+          let result;
+          try {
+              result = (typeof window.loadDashboardStats === 'function')
+                  ? await window.loadDashboardStats()
+                  : { stats: window.SDRSStats.calculateDashboardStats(SDRSStorageManager.getAllOrders()) };
+          } catch (err) {
+              console.warn('[SDRS] syncDashboardStats failed', err);
+              if (navigator.onLine) {
+                  setSystemStatus('syncIssue');
+              } else {
+                  setSystemStatus('offline');
+              }
+              result = { stats: window.SDRSStats.calculateDashboardStats(SDRSStorageManager.getAllOrders()) };
+          }
           const stats = result.stats;
 
           const totalEl = document.getElementById('stat-total');
@@ -399,28 +765,185 @@
           console.debug('[SDRS] syncDashboardStats done', window.globalStats);
       }
 
+      function escapeHtml(value) {
+          return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+              '&': '&amp;',
+              '<': '&lt;',
+              '>': '&gt;',
+              '"': '&quot;',
+              "'": '&#39;'
+          }[char]));
+      }
+
+      function getRecordTime(record) {
+          return record?.createdAt || record?.created_at || record?.updatedAt || record?.updated_at || record?.timestamp || record?.delivery_date || '';
+      }
+
+      function formatRecordTime(record) {
+          const rawTime = getRecordTime(record);
+          if (!rawTime) return '-';
+          const date = new Date(rawTime);
+          if (Number.isNaN(date.getTime())) return String(rawTime);
+          return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      }
+
+      function hasRecordIssue(record) {
+          const status = normalizeStatus(record?.delivery_status || record?.outlet_status || record?.status);
+          return status === 'REJECTED'
+              || status === 'MISMATCH'
+              || Boolean(record?.complaint || record?.complaints || record?.issue || record?.issues || record?.mismatch);
+      }
+
+      function getRecordStatusMeta(record) {
+          const deliveryStatus = normalizeStatus(record?.delivery_status || record?.status);
+          const outletStatus = normalizeStatus(record?.outlet_status || record?.outletStatus);
+
+          if (hasRecordIssue(record)) return { label: 'Issues', className: 'issues' };
+          if (deliveryStatus === 'COMPLETED' || outletStatus === 'COMPLETED') return { label: 'Completed', className: 'completed' };
+          if (deliveryStatus === 'PENDING_DRIVER') return { label: 'Pending Driver', className: 'pending-driver' };
+          if (deliveryStatus === 'VERIFIED_BY_DRIVER' && outletStatus === 'PENDING_OUTLET') return { label: 'Pending Outlet', className: 'pending-outlet' };
+          return { label: deliveryStatus || outletStatus || 'Pending', className: 'default' };
+      }
+
+      function getActivityLabel(record) {
+          const deliveryStatus = normalizeStatus(record?.delivery_status || record?.status);
+          const outletStatus = normalizeStatus(record?.outlet_status || record?.outletStatus);
+
+          if (hasRecordIssue(record)) return 'Issue reported';
+          if (deliveryStatus === 'COMPLETED' || outletStatus === 'COMPLETED') return 'Delivery completed';
+          if (deliveryStatus === 'VERIFIED_BY_DRIVER' && outletStatus === 'PENDING_OUTLET') return 'Driver verified delivery';
+          if (deliveryStatus === 'PENDING_DRIVER') return 'Warehouse created transfer';
+          if (outletStatus === 'COMPLETED') return 'Outlet received delivery';
+          return 'Warehouse created transfer';
+      }
+
+      async function getDashboardWidgetRecords() {
+          if (window.SDRSSupabase && typeof window.SDRSSupabase.fetchDeliveryRecords === 'function' && navigator.onLine) {
+              try {
+                  const records = await window.SDRSSupabase.fetchDeliveryRecords();
+                  if (Array.isArray(records)) return records;
+              } catch (err) {
+                  console.warn('[SDRS] dashboard widget records fetch failed', err);
+                  setSystemStatus('syncIssue');
+              }
+          }
+          return SDRSStorageManager.getAllOrders();
+      }
+
+      function sortRecentRecords(records) {
+          return [...records].sort((a, b) => {
+              const aTime = new Date(getRecordTime(a)).getTime() || 0;
+              const bTime = new Date(getRecordTime(b)).getTime() || 0;
+              return bTime - aTime;
+          });
+      }
+
+      function renderLatestDeliveryHistory(records) {
+          const list = document.getElementById('latest-delivery-list');
+          if (!list) return;
+          const recentRecords = sortRecentRecords(records).slice(0, 5);
+
+          if (!recentRecords.length) {
+              list.innerHTML = '<div class="py-10 text-center text-sm font-semibold text-slate-400">No recent deliveries.</div>';
+              return;
+          }
+
+          list.innerHTML = recentRecords.map((record) => {
+              const status = getRecordStatusMeta(record);
+              const transferId = record.transferId || record.orderId || record.id || record.outlet_id || '-';
+              const outlet = record.outletName || record.destinationOutletName || record.outlet_name || record.outletId || record.outlet_id || '-';
+              return `
+                <div class="history-row text-sm">
+                  <span class="font-extrabold text-[#0F4C81]">${escapeHtml(transferId)}</span>
+                  <span class="font-semibold text-slate-600">${escapeHtml(outlet)}</span>
+                  <span class="status-chip ${status.className}">${escapeHtml(status.label)}</span>
+                  <span class="text-xs font-bold text-slate-400">${escapeHtml(formatRecordTime(record))}</span>
+                </div>
+              `;
+          }).join('');
+      }
+
+      function renderLiveActivity(records) {
+          const list = document.getElementById('live-activity-list');
+          if (!list) return;
+          const recentRecords = sortRecentRecords(records).slice(0, 5);
+
+          if (!recentRecords.length) {
+              list.innerHTML = '<div class="py-10 text-center text-sm font-semibold text-slate-400">No activity recorded yet.</div>';
+              return;
+          }
+
+          list.innerHTML = recentRecords.map((record) => {
+              const status = getRecordStatusMeta(record);
+              const transferId = record.transferId || record.orderId || record.id || record.outlet_id || '-';
+              const outlet = record.outletName || record.destinationOutletName || record.outlet_name || record.outletId || record.outlet_id || '-';
+              return `
+                <div class="activity-item">
+                  <span class="activity-dot"></span>
+                  <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p class="text-sm font-extrabold text-navy">${escapeHtml(getActivityLabel(record))}</p>
+                      <p class="text-xs font-semibold text-slate-500">${escapeHtml(transferId)} - ${escapeHtml(outlet)}</p>
+                    </div>
+                    <span class="text-xs font-bold text-slate-400">${escapeHtml(formatRecordTime(record))}</span>
+                  </div>
+                </div>
+              `;
+          }).join('');
+      }
+
+      async function renderDashboardWidgets() {
+          const records = await getDashboardWidgetRecords();
+          renderLatestDeliveryHistory(records);
+          renderLiveActivity(records);
+      }
+
       window.updateGlobalStats = syncDashboardStats;
       window.updateDashboardStats = syncDashboardStats;
+      window.updateSystemStatus = refreshSystemStatus;
+      window.renderDashboardWidgets = renderDashboardWidgets;
 
       document.addEventListener('DOMContentLoaded', () => {
-          window.loadDashboardStats().then(() => syncDashboardStats());
+          refreshSystemStatus().then(() => {
+              window.loadDashboardStats().then(() => syncDashboardStats()).catch((err) => {
+                  console.warn('[SDRS] loadDashboardStats failed on page load', err);
+                  setSystemStatus(navigator.onLine ? 'syncIssue' : 'offline');
+              });
+              renderDashboardWidgets();
+          });
       });
+
+      window.addEventListener('online', () => {
+          refreshSystemStatus().then(() => {
+              syncDashboardStats();
+              renderDashboardWidgets();
+          });
+      });
+
+      window.addEventListener('offline', () => {
+          setSystemStatus('offline');
+      });
+
+      setInterval(refreshSystemStatus, 30000);
 
       window.addEventListener('storage', (event) => {
           console.debug('[SDRS] storage event', event.key, event.newValue ? 'updated' : 'removed');
           if (!event.key || SDRS_SYNC_KEYS.includes(event.key)) {
               syncDashboardStats();
+              renderDashboardWidgets();
           }
       });
 
       window.addEventListener('local_state_updated', () => {
           console.debug('[SDRS] local_state_updated event received');
           syncDashboardStats();
+          renderDashboardWidgets();
       });
 
       window.addEventListener('state_sync', () => {
           console.debug('[SDRS] state_sync event received');
           syncDashboardStats();
+          renderDashboardWidgets();
       });
   </script>
  </body>
