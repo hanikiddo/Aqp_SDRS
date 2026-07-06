@@ -89,6 +89,15 @@
       background: linear-gradient(165deg, #07335c 0%, #0F4C81 48%, #0a2b4b 100%);
       box-shadow: 20px 0 50px rgba(15,76,129,0.16);
     }
+    .mobile-sidebar-overlay {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 300ms ease;
+    }
+    .mobile-sidebar-overlay.is-open {
+      opacity: 1;
+      pointer-events: auto;
+    }
     .sidebar-link {
       display: flex;
       align-items: center;
@@ -276,8 +285,10 @@
  </head>
  <body class="min-h-screen text-slate-800">
 
+  <div id="mobile-sidebar-overlay" class="mobile-sidebar-overlay fixed inset-0 z-40 bg-slate-950/45 lg:hidden"></div>
+
   <!-- Fixed Sidebar -->
-  <aside class="sidebar-shell fixed left-4 top-4 bottom-4 z-40 hidden w-[260px] rounded-[2rem] p-4 lg:flex flex-col">
+  <aside id="sidebar-drawer" class="sidebar-shell fixed left-0 top-0 bottom-0 z-50 flex w-[280px] -translate-x-full flex-col p-4 transition-transform duration-300 ease-out lg:left-4 lg:top-4 lg:bottom-4 lg:z-40 lg:w-[260px] lg:translate-x-0 lg:rounded-[2rem]">
     <div class="flex items-center gap-3 px-2 pb-6 pt-2">
       <img src="assets/logo.jpg" alt="Farmasi Al Qanaah Logo" class="w-11 h-11 rounded-2xl object-cover border border-white/30 shadow-lg" />
       <div>
@@ -327,6 +338,9 @@
       <div class="glass-panel h-auto rounded-[1.75rem] px-4 py-3 sm:px-5 flex flex-col gap-3 md:h-16 md:flex-row md:items-center md:justify-between">
         <div class="flex items-center justify-between gap-3">
           <div class="flex items-center gap-3 lg:hidden">
+            <button id="mobile-sidebar-toggle" type="button" aria-label="Open navigation menu" aria-expanded="false" class="h-10 w-10 rounded-2xl border border-white/70 bg-white/70 text-[#0F4C81] flex items-center justify-center shadow-sm">
+              <i data-lucide="menu" style="width:20px;height:20px;"></i>
+            </button>
             <img src="assets/logo.jpg" alt="Farmasi Al Qanaah Logo" class="w-10 h-10 rounded-2xl shadow-sm object-cover border border-white" />
             <div>
               <h1 class="text-base font-extrabold text-navy tracking-tight leading-none">Farmasi Al Qanaah</h1>
@@ -614,6 +628,57 @@
           setTimeout(() => {
               window.location.href = 'admin/index.html';
           }, 400);
+      }
+
+      function setMobileSidebarOpen(isOpen) {
+          const sidebar = document.getElementById('sidebar-drawer');
+          const overlay = document.getElementById('mobile-sidebar-overlay');
+          const toggle = document.getElementById('mobile-sidebar-toggle');
+          if (!sidebar || !overlay) return;
+
+          sidebar.classList.toggle('-translate-x-full', !isOpen);
+          sidebar.classList.toggle('translate-x-0', isOpen);
+          overlay.classList.toggle('is-open', isOpen);
+          document.body.classList.toggle('overflow-hidden', isOpen);
+          if (toggle) {
+              toggle.setAttribute('aria-expanded', String(isOpen));
+          }
+      }
+
+      function closeMobileSidebar() {
+          if (window.matchMedia('(max-width: 1023px)').matches) {
+              setMobileSidebarOpen(false);
+          }
+      }
+
+      function initMobileSidebar() {
+          const toggle = document.getElementById('mobile-sidebar-toggle');
+          const overlay = document.getElementById('mobile-sidebar-overlay');
+          const sidebar = document.getElementById('sidebar-drawer');
+
+          if (toggle) {
+              toggle.addEventListener('click', () => {
+                  const isOpen = toggle.getAttribute('aria-expanded') === 'true';
+                  setMobileSidebarOpen(!isOpen);
+              });
+          }
+
+          if (overlay) {
+              overlay.addEventListener('click', () => setMobileSidebarOpen(false));
+          }
+
+          if (sidebar) {
+              sidebar.querySelectorAll('a').forEach((link) => {
+                  link.addEventListener('click', closeMobileSidebar);
+              });
+          }
+
+          window.addEventListener('resize', () => {
+              if (window.matchMedia('(min-width: 1024px)').matches) {
+                  setMobileSidebarOpen(false);
+                  document.body.classList.remove('overflow-hidden');
+              }
+          });
       }
 
       function setSystemStatus(status) {
@@ -904,6 +969,7 @@
       window.renderDashboardWidgets = renderDashboardWidgets;
 
       document.addEventListener('DOMContentLoaded', () => {
+          initMobileSidebar();
           refreshSystemStatus().then(() => {
               window.loadDashboardStats().then(() => syncDashboardStats()).catch((err) => {
                   console.warn('[SDRS] loadDashboardStats failed on page load', err);
