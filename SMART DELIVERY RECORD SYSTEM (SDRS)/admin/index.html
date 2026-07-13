@@ -258,6 +258,72 @@
           if (panel) panel.classList.add('hidden');
       }
 
+      let adminRecords = [];
+      let adminUsesSupabase = false;
+
+      const ADMIN_STATUS_GROUPS = {
+          pendingDriver: ['PENDING_DRIVER', 'CREATED', 'PENDING', 'READY_FOR_PICKUP'],
+          pendingOutlet: ['VERIFIED_BY_DRIVER', 'PENDING_OUTLET', 'DRIVER_VERIFIED', 'IN_TRANSIT'],
+          completed: ['COMPLETED', 'DELIVERED', 'RECEIVED', 'FULFILLED'],
+          issues: ['ISSUE', 'ISSUES', 'MISMATCH', 'DISCREPANCY', 'REJECTED', 'DAMAGED', 'MISSING']
+      };
+
+      function normalizeStatusValue(value) {
+          return String(value || '').trim().replace(/\s+/g, '_').toUpperCase();
+      }
+
+      function getRecordStatusValues(record) {
+          return [
+              record?.delivery_status,
+              record?.driver_status,
+              record?.driverStatus,
+              record?.outlet_status,
+              record?.outletStatus,
+              record?.status,
+              record?.global_status,
+              record?.globalStatus
+          ].map(normalizeStatusValue).filter(Boolean);
+      }
+
+      function normalizeDeliveryStatus(record) {
+          const statuses = getRecordStatusValues(record);
+          const hasStatus = (group) => statuses.some((status) => ADMIN_STATUS_GROUPS[group].includes(status));
+
+          if (hasStatus('issues')) return { category: 'issues', status: 'ISSUE/MISMATCH', badgeStatus: 'ISSUE/MISMATCH', statuses };
+          if (hasStatus('completed')) return { category: 'completed', status: 'COMPLETED', badgeStatus: 'COMPLETED', statuses };
+          if (hasStatus('pendingOutlet')) return { category: 'pendingOutlet', status: 'PENDING_OUTLET', badgeStatus: 'VERIFIED_BY_DRIVER', statuses };
+          if (hasStatus('pendingDriver')) return { category: 'pendingDriver', status: 'PENDING_DRIVER', badgeStatus: 'PENDING_DRIVER', statuses };
+          return { category: 'other', status: statuses[0] || 'PENDING', badgeStatus: statuses[0] || 'PENDING', statuses };
+      }
+
+      function getAdminNormalizedRecords(records = adminRecords) {
+          return (records || []).map((record) => ({
+              ...record,
+              normalizedStatus: normalizeDeliveryStatus(record)
+          }));
+      }
+
+      function calculateAdminKpiStats(normalizedRecords) {
+          return normalizedRecords.reduce((stats, record) => {
+              stats.total += 1;
+              switch (record.normalizedStatus.category) {
+                  case 'issues':
+                      stats.issues += 1;
+                      break;
+                  case 'completed':
+                      stats.completed += 1;
+                      break;
+                  case 'pendingOutlet':
+                      stats.outletPending += 1;
+                      break;
+                  case 'pendingDriver':
+                      stats.driverPending += 1;
+                      break;
+              }
+              return stats;
+          }, { total: 0, driverPending: 0, outletPending: 0, completed: 0, issues: 0 });
+      }
+
       function getBadgeForStatus(status) {
           switch(status) {
               case 'CREATED':
@@ -265,6 +331,7 @@
               case 'VERIFIED_BY_DRIVER':
               case 'VERIFIED BY DRIVER': return `<span class="bg-purple-100 text-purple-700 px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider">In Transit</span>`;
               case 'COMPLETED': return `<span class="bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 w-fit"><i data-lucide="check" style="width:12px;height:12px;"></i> Completed</span>`;
+              case 'ISSUE/MISMATCH': return `<span class="bg-red-100 text-red-700 px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider">Issue/Mismatch</span>`;
               case 'DISCREPANCY': return `<span class="bg-red-100 text-red-700 px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider">Driver Issue</span>`;
               case 'MISMATCH': return `<span class="bg-red-100 text-red-700 px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider">Outlet Mismatch</span>`;
               default: return `<span class="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider">${status}</span>`;
@@ -277,10 +344,10 @@
       }
 
       async function syncDashboardStats() {
-          const result = (window.SDRSStats && typeof window.SDRSStats.loadDashboardStats === 'function')
-              ? await window.SDRSStats.loadDashboardStats()
-              : { stats: window.SDRSStats.calculateDashboardStats(getOrders()) };
-          const stats = result.stats;
+          const normalizedRecords = getAdminNormalizedRecords();
+          const stats = calculateAdminKpiStats(normalizedRecords);
+          console.log("[ADMIN NORMALIZED RECORDS]", normalizedRecords);
+          console.log("[ADMIN KPI STATS]", stats);
 
           document.getElementById('kpi-total').textContent = stats.total || 0;
           document.getElementById('kpi-driver').textContent = stats.driverPending || 0;
@@ -325,7 +392,8 @@
       };
 
       function renderTable() {
-          const orders = getOrders();
+          const normalizedRecords = getAdminNormalizedRecords();
+          const orders = normalizedRecords;
           window.sdrsOrders = orders;
 
           // Table Update
@@ -338,27 +406,28 @@
 
           let html = '';
           orders.forEach(order => {
+              const normalized = order.normalizedStatus || normalizeDeliveryStatus(order);
               const itemsPreview = getItemsPreview(order);
               const totalBoxes = getOrderTotalBoxes(order);
-              
+               
               let driverScan = 'Pending';
-              if (order.status === 'OUTLET_TRANSFER_PENDING') {
+              if (normalized.category === 'pendingDriver') {
+                  driverScan = 'Pending';
+              } else if (normalizeStatusValue(order.status) === 'OUTLET_TRANSFER_PENDING') {
                   driverScan = '--';
-              } else if(!['CREATED', 'PENDING_DRIVER', 'PENDING'].includes((order.status || '').toString().toUpperCase())) {
+              } else if(normalized.category !== 'pendingDriver') {
                   driverScan = `Verified ${order.verifiedAt || ''}`;
               }
-              
+               
               let outletLog = '--';
-              if(['VERIFIED_BY_DRIVER', 'VERIFIED BY DRIVER'].includes((order.status || '').toString().toUpperCase())) {
+              if(normalized.category === 'pendingOutlet') {
                   outletLog = 'Pending';
-              } else if(order.status === 'COMPLETED') {
+              } else if(normalized.category === 'completed') {
                   outletLog = `Received ${order.receivedAt || ''}`;
               }
 
-              const isCompleted = order.status === 'COMPLETED';
-              const statusLabel = isCompleted ? 'Completed' : (['VERIFIED_BY_DRIVER', 'VERIFIED BY DRIVER'].includes((order.status || '').toString().toUpperCase()) ? 'Processing' : 'Pending');
-              const statusColor = isCompleted ? 'green' : 'orange';
-              const statusBadge = `<span class="bg-${statusColor}-100 text-${statusColor}-700 px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider">${statusLabel}</span>`;
+              const isCompleted = normalized.category === 'completed';
+              const statusBadge = getBadgeForStatus(normalized.badgeStatus);
               const deleteButton = isCompleted
                   ? `<button type="button" onclick="deleteOrder('${order.id}')" class="text-red-600 hover:text-red-800 transition-colors" title="Delete record"><i data-lucide="trash-2" style="width:18px;height:18px;"></i></button>`
                   : `<span class="text-slate-400 opacity-50" title="Delete unavailable"><i data-lucide="trash-2" style="width:18px;height:18px;"></i></span>`;
@@ -366,10 +435,10 @@
               const viewDetailsButton = `<button type="button" onclick="openOrderDetails('${order.id}')" class="text-teal hover:text-teal-800 transition-colors mr-3" title="View details"><i data-lucide="eye" style="width:18px;height:18px;"></i></button>`;
 
               html += `
-                  <tr class="border-b border-navy/5 hover:bg-slate-50 transition-colors ${order.hasIssue ? 'bg-red-50/50' : ''}">
+                  <tr class="border-b border-navy/5 hover:bg-slate-50 transition-colors ${normalized.category === 'issues' ? 'bg-red-50/50' : ''}">
                       <td class="px-5 py-4 font-bold text-navy whitespace-nowrap">
                           ${getSourceOutletLabel(order)}
-                          ${order.hasIssue ? '<span class="inline-flex items-center gap-1 text-red-600 text-xs font-semibold ml-2"><i data-lucide="alert-triangle" style="width:14px;height:14px;"></i>Note</span>' : ''}
+                          ${normalized.category === 'issues' ? '<span class="inline-flex items-center gap-1 text-red-600 text-xs font-semibold ml-2"><i data-lucide="alert-triangle" style="width:14px;height:14px;"></i>Issue</span>' : ''}
                       </td>
                       <td class="px-5 py-4 text-xs font-semibold text-slate-600 whitespace-nowrap">${order.createdAt || '--'}</td>
                       <td class="px-5 py-4 font-semibold text-teal">${getDestinationLabel(order)}</td>
@@ -455,6 +524,9 @@
       }
 
       function getOrders() {
+          if (adminUsesSupabase) {
+              return adminRecords;
+          }
           try {
               const manager = window.SDRSStateManager;
               const sourceKeys = ['adminGlobalPipeline', 'warehouseTransfers', 'driverQueue', 'driverHistory', 'outletIncomingQueue', 'outletHistory'];
@@ -511,23 +583,29 @@
           if (!window.SDRSSupabase || !window.SDRSSupabase.isConfigured || !window.SDRSSupabase.isConfigured()) return false;
           const records = await window.SDRSSupabase.safeCall('[SUPABASE] load admin records', () => window.SDRSSupabase.fetchDeliveryRecords());
           if (!Array.isArray(records)) return false;
+          console.log("[ADMIN RECORD COUNT]", records.length);
+          adminUsesSupabase = true;
+          adminRecords = records;
+          const normalizedRecords = getAdminNormalizedRecords(records);
+          const stats = calculateAdminKpiStats(normalizedRecords);
+          console.log("[ADMIN NORMALIZED RECORDS]", normalizedRecords);
+          console.log("[ADMIN KPI STATS]", stats);
           const manager = window.SDRSStateManager;
-          const merged = records;
           if (manager) {
-              manager.setState('adminGlobalPipeline', merged);
+              manager.setState('adminGlobalPipeline', records);
               manager.setState('warehouseTransfers', []);
               manager.setState('driverQueue', []);
               manager.setState('driverHistory', []);
               manager.setState('outletIncomingQueue', []);
               manager.setState('outletHistory', []);
           } else {
-              localStorage.setItem('adminGlobalPipeline', JSON.stringify(merged));
+              localStorage.setItem('adminGlobalPipeline', JSON.stringify(records));
           }
-          localStorage.setItem('adminGlobalPipeline', JSON.stringify(merged));
-          localStorage.setItem('sdrs_main_orders', JSON.stringify(merged));
-          localStorage.setItem('sdrs_records', JSON.stringify(merged));
           if (records.length === 0) {
               [
+                  'adminGlobalPipeline',
+                  'sdrs_main_orders',
+                  'sdrs_records',
                   'warehouseTransfers',
                   'driverQueue',
                   'driverHistory',
@@ -541,7 +619,7 @@
                   'orders'
               ].forEach((key) => localStorage.removeItem(key));
           }
-          window.sdrsOrders = merged;
+          window.sdrsOrders = records;
           refreshAdminDashboard();
           return true;
       }
@@ -588,7 +666,7 @@
       }
 
       function findOrderById(orderId) {
-          const orders = getOrders();
+          const orders = adminUsesSupabase ? adminRecords : getOrders();
           return orders.find(o => String(o.id) === String(orderId) || String(o.orderId) === String(orderId) || String(o.transferId) === String(orderId));
       }
 
@@ -785,6 +863,16 @@
           renderTable();
           updateDashboardStats();
       }
+
+      async function refreshAdminDataFromSource() {
+          const loadedFromSupabase = await loadAdminRecordsFromSupabase();
+          if (!loadedFromSupabase && !adminUsesSupabase) {
+              adminRecords = getOrders();
+              refreshAdminDashboard();
+          }
+          return loadedFromSupabase;
+      }
+      window.refreshAdminDataFromSource = refreshAdminDataFromSource;
 
       function viewDetails(orderId) {
           openOrderDetails(orderId);
@@ -1030,11 +1118,12 @@
 
       // Init and listeners - unified sync across all events
       document.addEventListener('DOMContentLoaded', async () => {
-          const loadedFromSupabase = await loadAdminRecordsFromSupabase();
-          if (!loadedFromSupabase) {
+          const loadedFromSupabase = await refreshAdminDataFromSource();
+          if (!loadedFromSupabase && !adminUsesSupabase) {
               migrateOrderStorage();
+              adminRecords = getOrders();
+              refreshAdminDashboard();
           }
-          refreshAdminDashboard();
           checkComplaints();
           updateSystem();
           // Auto-sync every 2 seconds for near real-time updates
@@ -1042,9 +1131,10 @@
       });
 
       // Real-time storage listener (from other browser tabs/windows)
-      window.addEventListener('storage', (e) => {
-          if (e.key === 'adminGlobalPipeline' || e.key === null) {
-              refreshAdminDashboard();
+      window.addEventListener('storage', async (e) => {
+          const syncKeys = ['adminGlobalPipeline', 'warehouseTransfers', 'driverQueue', 'driverHistory', 'outletIncomingQueue', 'outletHistory', 'sdrs_main_orders', 'sdrs_records'];
+          if (e.key === null || syncKeys.includes(e.key)) {
+              await refreshAdminDataFromSource();
               refreshOpenOrderDetails();
           }
           if (e.key === 'complaints') {
@@ -1054,14 +1144,20 @@
       });
 
       // Real-time custom event listeners (same window)
-      window.addEventListener('local_state_updated', () => {
-          refreshAdminDashboard();
+      window.addEventListener('local_state_updated', async () => {
+          await refreshAdminDataFromSource();
           updateSystem();
           refreshOpenOrderDetails();
       });
-      
-      window.addEventListener('state_sync', () => {
-          refreshAdminDashboard();
+       
+      window.addEventListener('state_sync', async () => {
+          await refreshAdminDataFromSource();
+          updateSystem();
+          refreshOpenOrderDetails();
+      });
+
+      window.addEventListener('sdrs_sync', async () => {
+          await refreshAdminDataFromSource();
           updateSystem();
           refreshOpenOrderDetails();
       });
@@ -1076,14 +1172,6 @@
       `;
       document.head.appendChild(style);
 
-      // Initialize on page load
-      window.onload = async () => {
-          const loadedFromSupabase = await loadAdminRecordsFromSupabase();
-          if (!loadedFromSupabase) {
-              migrateOrderStorage();
-          }
-          refreshAdminDashboard();
-      };
   </script>
  </body>
 </html>

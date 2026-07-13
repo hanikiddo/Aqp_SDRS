@@ -77,7 +77,9 @@ async function confirmClearDemo() {
     clearSDRSLocalStorage();
     resetAdminDashboardView();
 
-    if (typeof refreshAdminDashboard === 'function') {
+    if (typeof refreshAdminDataFromSource === 'function') {
+        await refreshAdminDataFromSource();
+    } else if (typeof refreshAdminDashboard === 'function') {
         refreshAdminDashboard();
     }
 
