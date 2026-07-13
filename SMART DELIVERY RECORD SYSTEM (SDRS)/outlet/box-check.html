@@ -142,8 +142,7 @@
       const receivedBoxClass = confirmed ? 'border-purple-300 bg-purple-50' : 'border-orange-300 bg-orange-50';
       const inputDisabled = confirmed ? 'disabled' : '';
 
-      const options = Array.from({ length: Math.max(expectedQty, 10) }, (_, q) => {
-        const value = q + 1;
+      const options = [-10, -9, -8, -7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((value) => {
         return `<option value="${value}" ${value === receivedQty ? 'selected' : ''}>${value}</option>`;
       }).join('');
 
