@@ -276,8 +276,10 @@
       };
 
       console.log("[OUTLET SENDER PAYLOAD]", transfer);
+      console.log("[OUTLET SENDER ORIGINAL TRANSFER]", transfer);
 
       let savedRecord = transfer;
+      let normalizedSavedRecord = transfer;
       if (window.SDRSSupabase && typeof window.SDRSSupabase.saveDeliveryRecord === 'function' && window.SDRSSupabase.isConfigured()) {
         try {
           savedRecord = await window.SDRSSupabase.saveDeliveryRecord(transfer);
@@ -286,6 +288,7 @@
           }
           console.log("[OUTLET SENDER SUPABASE INSERT]", savedRecord);
           console.log("[OUTLET SENDER SAVED]", savedRecord);
+          console.log("[OUTLET SENDER RAW SAVE RESULT]", savedRecord);
         } catch (error) {
           console.error('[OUTLET SENDER SUPABASE ERROR]', error);
           alert('Transfer was not saved. Please check the console for the Supabase error.');
@@ -295,8 +298,56 @@
         console.warn('[OUTLET SENDER SUPABASE ERROR] Supabase is not configured. Saving to local fallback only.');
       }
 
-      saveToStorage(savedRecord);
-      localStorage.setItem('sdrs_last_outlet_sender_transfer', JSON.stringify(savedRecord));
+      const savedObject = Array.isArray(savedRecord) ? (savedRecord[0] || {}) : savedRecord;
+      normalizedSavedRecord = {
+        ...transfer,
+        ...savedObject
+      };
+      normalizedSavedRecord.delivery_status =
+        normalizedSavedRecord.delivery_status ||
+        normalizedSavedRecord.driver_status ||
+        normalizedSavedRecord.status ||
+        'PENDING_DRIVER';
+      normalizedSavedRecord.driver_status =
+        normalizedSavedRecord.driver_status ||
+        normalizedSavedRecord.driverStatus ||
+        'PENDING_DRIVER';
+      normalizedSavedRecord.status =
+        normalizedSavedRecord.status ||
+        normalizedSavedRecord.delivery_status ||
+        'PENDING_DRIVER';
+      normalizedSavedRecord.source_type =
+        normalizedSavedRecord.source_type ||
+        normalizedSavedRecord.sourceType ||
+        'OUTLET_SENDER';
+      normalizedSavedRecord.sourceType =
+        normalizedSavedRecord.sourceType ||
+        normalizedSavedRecord.source_type;
+      normalizedSavedRecord.destination_id =
+        normalizedSavedRecord.destination_id ||
+        normalizedSavedRecord.destinationId ||
+        destinationId;
+      normalizedSavedRecord.destinationId =
+        normalizedSavedRecord.destinationId ||
+        normalizedSavedRecord.destination_id;
+      normalizedSavedRecord.outlet_id =
+        normalizedSavedRecord.outlet_id ||
+        normalizedSavedRecord.outletId ||
+        normalizedSavedRecord.destination_id;
+      normalizedSavedRecord.outletId =
+        normalizedSavedRecord.outletId ||
+        normalizedSavedRecord.outlet_id;
+      normalizedSavedRecord.items = Array.isArray(normalizedSavedRecord.items) ? normalizedSavedRecord.items : [item];
+      normalizedSavedRecord.xfers = Array.isArray(normalizedSavedRecord.xfers) ? normalizedSavedRecord.xfers : normalizedSavedRecord.items;
+      normalizedSavedRecord.xferItems = Array.isArray(normalizedSavedRecord.xferItems) ? normalizedSavedRecord.xferItems : normalizedSavedRecord.items;
+      normalizedSavedRecord.totalBoxes = normalizedSavedRecord.totalBoxes || normalizedSavedRecord.total_boxes || totalBoxes;
+      normalizedSavedRecord.total_boxes = normalizedSavedRecord.total_boxes || normalizedSavedRecord.totalBoxes;
+
+      console.log("[OUTLET SENDER NORMALIZED RECORD]", normalizedSavedRecord);
+
+      saveToStorage(normalizedSavedRecord);
+      localStorage.setItem('sdrs_last_outlet_sender_transfer', JSON.stringify(normalizedSavedRecord));
+      console.log('[OUTLET SENDER FINAL STORED RECORD]', JSON.parse(localStorage.getItem('sdrs_last_outlet_sender_transfer')));
       window.location.href = 'order-done.html';
     }
 

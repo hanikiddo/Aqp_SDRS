@@ -203,6 +203,11 @@ async function loadDashboardStats(fallbackOrders = null) {
 
     const stats = calculateDashboardStats(records);
     console.log("[DASHBOARD RECORD COUNT]", records.length);
+    console.log('[DASHBOARD OUTLET SENDER RECORDS]',
+        records.filter(record =>
+            String(record.source_type || record.sourceType).toUpperCase() === 'OUTLET_SENDER'
+        )
+    );
     if (source === 'supabase') {
         console.log('[DASHBOARD USING SUPABASE ONLY]', {
             totalRecords: records.length,

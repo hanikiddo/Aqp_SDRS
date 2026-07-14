@@ -584,6 +584,11 @@
           const records = await window.SDRSSupabase.safeCall('[SUPABASE] load admin records', () => window.SDRSSupabase.fetchDeliveryRecords());
           if (!Array.isArray(records)) return false;
           console.log("[ADMIN RECORD COUNT]", records.length);
+          console.log('[DASHBOARD OUTLET SENDER RECORDS]',
+              records.filter(record =>
+                  String(record.source_type || record.sourceType).toUpperCase() === 'OUTLET_SENDER'
+              )
+          );
           adminUsesSupabase = true;
           adminRecords = records;
           const normalizedRecords = getAdminNormalizedRecords(records);

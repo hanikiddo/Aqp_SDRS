@@ -231,6 +231,7 @@
       const records = await window.SDRSSupabase.safeCall('[SUPABASE] load driver records', () => window.SDRSSupabase.fetchDeliveryRecords());
       if (!Array.isArray(records)) return;
       console.log("DRIVER RECORDS:", records);
+      console.log('[DRIVER ALL RECORDS]', records);
       console.log("[DRIVER OUTLET-SENDER RECORDS]", records.filter(record => isOutletSenderOrder(record)));
       console.log("DRIVER REMARKS LOCATIONS:", records.map(record => ({
         transferId: record.transferId || record.orderId || record.id || record.outletId,
@@ -240,6 +241,7 @@
         rawRemarks: record.raw?.remarks || record.supabaseRow?.remarks
       })));
       const pendingRecords = records.filter(isDriverPendingRecord);
+      console.log('[DRIVER PENDING RECORDS]', pendingRecords);
       const historyRecords = records.filter(order => ['VERIFIED_BY_DRIVER', 'COMPLETED', 'REJECTED'].includes(normalizeStatus(order.delivery_status)));
       const manager = window.SDRSStateManager;
       if (manager) {
@@ -276,8 +278,8 @@
       const verifiedAt = now.toISOString();
       const destinationType = normalizeStatus(order.destinationType || order.destination_type);
       const isWarehouseDestination = destinationType === 'WAREHOUSE';
-      const destinationId = order.destinationId || order.destination_id || order.destinationOutletId || (isWarehouseDestination ? 'WAREHOUSE' : '');
-      const destinationName = order.destinationName || order.destinationOutletName || (isWarehouseDestination ? 'Warehouse' : '');
+      const destinationId = order.destinationId || order.destination_id || order.destinationOutletId || (isWarehouseDestination ? 'WH' : '');
+      const destinationName = order.destinationName || order.destinationOutletName || (isWarehouseDestination ? 'Warehouse Sierra Perdana' : '');
       const nextOutletStatus = isWarehouseDestination ? 'PENDING_WAREHOUSE' : 'PENDING_OUTLET';
 
       const updatedOrder = {
@@ -372,10 +374,8 @@
         console.log('verifyOrder: removed from driverQueue');
         manager.appendState('driverHistory', historyRecord);
         console.log('verifyOrder: added to driverHistory');
-        if (!isWarehouseDestination) {
-          manager.appendState('outletIncomingQueue', incomingOrder);
-          console.log('verifyOrder: pushed to outletIncomingQueue');
-        }
+        manager.appendState('outletIncomingQueue', incomingOrder);
+        console.log('verifyOrder: pushed to outletIncomingQueue');
         manager.updateState('warehouseTransfers', (orders) => orders.map((item) => {
           if (getOrderKey(item) === orderKey) {
             return { ...item, ...incomingOrder };
@@ -403,9 +403,7 @@
       } else {
         window.sdrsState.driverQueue = (window.sdrsState.driverQueue || []).filter(task => getOrderKey(task) !== orderKey);
         window.sdrsState.driverHistory = [historyRecord, ...(window.sdrsState.driverHistory || [])];
-        if (!isWarehouseDestination) {
-          window.sdrsState.outletIncomingQueue = [...(window.sdrsState.outletIncomingQueue || []), incomingOrder];
-        }
+        window.sdrsState.outletIncomingQueue = [...(window.sdrsState.outletIncomingQueue || []), incomingOrder];
         window.sdrsState.warehouseTransfers = (window.sdrsState.warehouseTransfers || []).map((item) => {
           if (getOrderKey(item) === orderKey) {
             return { ...item, ...incomingOrder };

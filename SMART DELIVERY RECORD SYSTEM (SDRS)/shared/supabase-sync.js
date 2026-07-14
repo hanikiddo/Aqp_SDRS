@@ -179,6 +179,41 @@
     };
   }
 
+  function normalizeAppRecord(originalRecord = {}, savedRecord = {}) {
+    const saved = Array.isArray(savedRecord) ? (savedRecord[0] || {}) : (savedRecord || {});
+    const normalized = {
+      ...originalRecord,
+      ...saved
+    };
+    const transferId = normalized.transferId || normalized.transfer_id || normalized.orderId || originalRecord.transferId || originalRecord.id || originalRecord.orderId || normalized.id || '';
+    normalized.transferId = transferId;
+    normalized.transfer_id = normalized.transfer_id || transferId;
+    normalized.orderId = normalized.orderId || transferId;
+    normalized.id = normalized.id || transferId;
+    normalized.source_type = normalized.source_type || normalized.sourceType || originalRecord.source_type || originalRecord.sourceType || '';
+    normalized.sourceType = normalized.sourceType || normalized.source_type;
+    normalized.destinationId = normalized.destinationId || normalized.destination_id || originalRecord.destinationId || originalRecord.destination_id || normalized.destinationOutletId || '';
+    normalized.destination_id = normalized.destination_id || normalized.destinationId;
+    normalized.outletId = normalized.outletId || normalized.outlet_id || normalized.destinationOutletId || normalized.destinationId || transferId;
+    normalized.outlet_id = normalized.outlet_id || normalized.outletId;
+    normalized.outletName = normalized.outletName || normalized.outlet_name || normalized.destinationOutletName || normalized.destinationName || '';
+    normalized.outlet_name = normalized.outlet_name || normalized.outletName;
+    normalized.items = Array.isArray(normalized.items) ? normalized.items : getItems(normalized);
+    normalized.xfers = Array.isArray(normalized.xfers) ? normalized.xfers : normalized.items;
+    normalized.xferItems = Array.isArray(normalized.xferItems) ? normalized.xferItems : normalized.items;
+    normalized.totalBoxes = normalized.totalBoxes || normalized.total_boxes || getTotalBoxes(normalized);
+    normalized.total_boxes = normalized.total_boxes || normalized.totalBoxes;
+    normalized.delivery_status = normalized.delivery_status || normalized.driver_status || normalized.driverStatus || normalized.status || 'PENDING_DRIVER';
+    normalized.driver_status = normalized.driver_status || normalized.driverStatus || normalized.delivery_status || 'PENDING_DRIVER';
+    normalized.driverStatus = normalized.driverStatus || normalized.driver_status;
+    normalized.status = normalized.status || normalized.delivery_status || 'PENDING_DRIVER';
+    normalized.outlet_status = normalized.outlet_status || normalized.outletStatus || 'PENDING_OUTLET';
+    normalized.outletStatus = normalized.outletStatus || normalized.outlet_status;
+    normalized.createdAt = normalized.createdAt || originalRecord.createdAt || saved.created_at;
+    normalized.createdTimestamp = normalized.createdTimestamp || originalRecord.createdTimestamp || Date.now();
+    return normalized;
+  }
+
   async function request(query = '', options = {}) {
     if (!isConfigured()) {
       console.warn('[SUPABASE] missing anon key, using localStorage fallback');
@@ -228,7 +263,8 @@
     if (!response.ok) {
       throw new Error(rows?.message || rows?.hint || `Supabase request failed: ${response.status}`);
     }
-    return Array.isArray(rows) && rows[0] ? fromDbRecord(rows[0]) : null;
+    const savedRow = Array.isArray(rows) ? rows[0] : rows;
+    return savedRow ? normalizeAppRecord(record, fromDbRecord(savedRow)) : null;
   }
 
   async function updateDeliveryRecord(recordOrId, patch = {}) {
@@ -289,6 +325,7 @@
     updateDeliveryRecordByOutletId,
     safeCall,
     fromDbRecord,
+    normalizeAppRecord,
     toDbRecord,
     toInsertRecord,
     isConfigured
