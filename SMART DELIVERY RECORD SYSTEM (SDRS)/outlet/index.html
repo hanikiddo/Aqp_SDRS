@@ -183,6 +183,8 @@
       if (!target) return false;
       return [
         order.outlet_id,
+        order.destination_id,
+        order.destinationId,
         order.destinationOutletId,
         order.outletId,
         order.transferId
@@ -190,7 +192,8 @@
     }
 
     function getTransferDisplayId(order) {
-      if (String(order.sourceType || '').toUpperCase() === 'OUTLET') {
+      const sourceType = String(order.sourceType || order.source_type || '').toUpperCase();
+      if (sourceType === 'OUTLET' || sourceType === 'OUTLET_SENDER') {
         return order.routeLabel || order.displayTransferId || `${order.sourceOutletId || 'OUTLET'} -> ${order.destinationOutletId || 'OUTLET'}`;
       }
       return order.transferId || order.id || 'UNKNOWN';
@@ -215,8 +218,8 @@
         outletId,
         status: 'VERIFIED_BY_DRIVER',
         delivery_status: 'VERIFIED_BY_DRIVER',
-        outletStatus: 'PENDING_OUTLET',
-        outlet_status: 'PENDING_OUTLET'
+        outletStatus: order.outletStatus || order.outlet_status || 'PENDING_OUTLET',
+        outlet_status: order.outlet_status || order.outletStatus || 'PENDING_OUTLET'
       };
     }
 
@@ -225,9 +228,12 @@
         renderOrders();
         return;
       }
+      const expectedOutletStatus = String(outletId || '').trim().toUpperCase() === 'WH'
+        ? 'PENDING_WAREHOUSE'
+        : 'PENDING_OUTLET';
       const filters = {
         delivery_status: 'VERIFIED_BY_DRIVER',
-        outlet_status: 'PENDING_OUTLET',
+        outlet_status: expectedOutletStatus,
         outlet_id: outletId
       };
       console.log('[OUTLET RECEIVER FILTER]', filters);
@@ -239,7 +245,7 @@
       console.log('[OUTLET RECEIVER RECORDS]', records);
       const rebuiltQueue = records
         .filter(order => normalizeStatus(order.delivery_status || order.status) === 'VERIFIED_BY_DRIVER')
-        .filter(order => normalizeStatus(order.outlet_status || order.outletStatus) === 'PENDING_OUTLET')
+        .filter(order => normalizeStatus(order.outlet_status || order.outletStatus) === expectedOutletStatus)
         .filter(order => orderMatchesOutlet(order, outletId))
         .map(normalizeSupabaseIncomingOrder);
 
@@ -275,12 +281,15 @@
       container.innerHTML = '';
 
       const outletId = getCurrentOutletId();
+      const expectedOutletStatus = String(outletId || '').trim().toUpperCase() === 'WH'
+        ? 'PENDING_WAREHOUSE'
+        : 'PENDING_OUTLET';
       const manager = window.SDRSStateManager;
       const incomingOrders = manager ? manager.getState('outletIncomingQueue') : JSON.parse(localStorage.getItem('outletIncomingQueue') || '[]');
       const arrivingOrders = (incomingOrders || []).filter(order => {
         return orderMatchesOutlet(order, outletId) &&
                normalizeStatus(order.delivery_status || order.status) === 'VERIFIED_BY_DRIVER' &&
-               normalizeStatus(order.outlet_status || order.outletStatus || 'PENDING_OUTLET') === 'PENDING_OUTLET';
+               normalizeStatus(order.outlet_status || order.outletStatus || expectedOutletStatus) === expectedOutletStatus;
       });
 
       countEl.textContent = arrivingOrders.length;

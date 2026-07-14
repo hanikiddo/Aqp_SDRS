@@ -128,6 +128,8 @@
   </main>
 
   <script src="../shared/state.js"></script>
+  <script src="../shared/supabase-config.js"></script>
+  <script src="../shared/supabase-sync.js"></script>
   <script>
     const OUTLETS = [
       { id: 'IDOUT01', name: 'Farmasi Al Qanaah Air Biru' },
@@ -136,7 +138,9 @@
       { id: 'IDOUT04', name: 'Farmasi Al Qanaah Taman Suria' },
       { id: 'IDOUT05', name: 'Farmasi Al Qanaah Sri Saujana' },
       { id: 'IDOUT06', name: 'Farmasi Al Qanaah Seri Alam' },
-      { id: 'IDOUT07', name: 'Farmasi Al Qanaah Pulai Mutiara' }
+      { id: 'IDOUT07', name: 'Farmasi Al Qanaah Pulai Mutiara' },
+      { id: 'IDOUT08', name: 'Farmasi Al Qanaah Sierra Perdana' },
+      { id: 'IDOUT09', name: 'Farmasi Al Qanaah Larkin' }
     ];
 
     function fillOutletSelect(select, outlets, placeholder) {
@@ -171,9 +175,10 @@
     }
 
     function saveToStorage(record) {
-      const isOutletDestination = String(record.destinationType || '').toUpperCase() === 'OUTLET';
+      const driverStatuses = ['PENDING_DRIVER', 'CREATED', 'READY_FOR_PICKUP', 'PENDING'];
+      const shouldQueueForDriver = driverStatuses.includes(String(record.delivery_status || record.driver_status || record.status || '').toUpperCase());
       if (window.SDRSStateManager) {
-        if (isOutletDestination) {
+        if (shouldQueueForDriver) {
           window.SDRSStateManager.appendState('driverQueue', record);
         }
         window.SDRSStateManager.appendState('adminGlobalPipeline', record);
@@ -181,7 +186,7 @@
         return;
       }
 
-      if (isOutletDestination) {
+      if (shouldQueueForDriver) {
         const driverQueue = JSON.parse(localStorage.getItem('driverQueue') || '[]');
         driverQueue.push(record);
         localStorage.setItem('driverQueue', JSON.stringify(driverQueue));
@@ -194,7 +199,7 @@
       localStorage.setItem('sdrs_records', JSON.stringify(adminPipeline));
     }
 
-    function submitOutletTransfer(event) {
+    async function submitOutletTransfer(event) {
       event.preventDefault();
 
       const sourceOutlet = getOutletById(document.getElementById('sourceOutlet').value);
@@ -219,10 +224,11 @@
         minute: '2-digit'
       });
       const id = `OTS-${now.getTime()}`;
-      const destinationName = destinationType === 'Warehouse' ? 'Warehouse' : destinationOutlet.name;
+      const destinationName = destinationType === 'Warehouse' ? 'Warehouse Sierra Perdana' : destinationOutlet.name;
+      const destinationId = destinationType === 'Warehouse' ? 'WH' : destinationOutlet.id;
       const routeLabel = destinationType === 'Outlet'
         ? `${sourceOutlet.id} -> ${destinationOutlet.id}`
-        : `${sourceOutlet.id} -> Warehouse`;
+        : `${sourceOutlet.id} -> WH`;
       const item = {
         xferNumber: itemName,
         name: itemName,
@@ -231,16 +237,22 @@
         remarks
       };
 
-      const record = {
+      const transfer = {
         id,
         transferId: id,
+        transfer_id: id,
         orderId: id,
-        sourceType: 'OUTLET',
+        sourceType: 'OUTLET_SENDER',
+        source_type: 'OUTLET_SENDER',
         sourceOutletId: sourceOutlet.id,
         sourceOutletName: sourceOutlet.name,
-        outletId: destinationOutlet ? destinationOutlet.id : sourceOutlet.id,
-        outletName: destinationOutlet ? destinationOutlet.name : sourceOutlet.name,
+        outletId: destinationOutlet ? destinationOutlet.id : destinationId,
+        outlet_id: destinationOutlet ? destinationOutlet.id : destinationId,
+        outletName: destinationOutlet ? destinationOutlet.name : destinationName,
+        outlet_name: destinationOutlet ? destinationOutlet.name : destinationName,
         destinationType: savedDestinationType,
+        destinationId,
+        destination_id: destinationId,
         destinationOutletId: destinationOutlet ? destinationOutlet.id : '',
         destinationOutletName: destinationOutlet ? destinationOutlet.name : '',
         destinationName,
@@ -251,16 +263,40 @@
         xfers: [item],
         xferItems: [item],
         totalBoxes,
+        total_boxes: totalBoxes,
         remarks,
+        delivery_status: 'PENDING_DRIVER',
+        driver_status: 'PENDING_DRIVER',
+        outlet_status: 'PENDING',
         status: 'PENDING_DRIVER',
-        outletStatus: 'PENDING_OUTLET',
+        outletStatus: 'PENDING',
         createdAt,
         createdTimestamp: now.getTime(),
         timestamps: { createdAt: now.getTime() }
       };
 
-      saveToStorage(record);
-      localStorage.setItem('sdrs_last_outlet_sender_transfer', JSON.stringify(record));
+      console.log("[OUTLET SENDER PAYLOAD]", transfer);
+
+      let savedRecord = transfer;
+      if (window.SDRSSupabase && typeof window.SDRSSupabase.saveDeliveryRecord === 'function' && window.SDRSSupabase.isConfigured()) {
+        try {
+          savedRecord = await window.SDRSSupabase.saveDeliveryRecord(transfer);
+          if (!savedRecord) {
+            throw new Error('Supabase returned no saved delivery record.');
+          }
+          console.log("[OUTLET SENDER SUPABASE INSERT]", savedRecord);
+          console.log("[OUTLET SENDER SAVED]", savedRecord);
+        } catch (error) {
+          console.error('[OUTLET SENDER SUPABASE ERROR]', error);
+          alert('Transfer was not saved. Please check the console for the Supabase error.');
+          return;
+        }
+      } else {
+        console.warn('[OUTLET SENDER SUPABASE ERROR] Supabase is not configured. Saving to local fallback only.');
+      }
+
+      saveToStorage(savedRecord);
+      localStorage.setItem('sdrs_last_outlet_sender_transfer', JSON.stringify(savedRecord));
       window.location.href = 'order-done.html';
     }
 

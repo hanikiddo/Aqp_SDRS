@@ -61,22 +61,54 @@
   function toDbRecord(record) {
     const items = record.items || record.xferItems || record.xfers || [];
     const { id, status, ...recordWithoutId } = record;
+    const destinationType = String(record.destinationType || record.destination_type || '').toUpperCase();
+    const destinationId = record.destinationId ||
+      record.destination_id ||
+      record.destinationOutletId ||
+      (destinationType === 'WAREHOUSE' ? 'WAREHOUSE' : '');
+    const dbOutletId = record.outlet_id ||
+      record.destinationOutletId ||
+      (destinationType === 'WAREHOUSE' ? destinationId : '') ||
+      record.outletId ||
+      record.outlet ||
+      '';
+    const dbOutletName = record.outlet_name ||
+      record.destinationOutletName ||
+      (destinationType === 'WAREHOUSE' ? (record.destinationName || 'Warehouse') : '') ||
+      record.outletName ||
+      record.outlet ||
+      '';
+    const deliveryStatus = record.delivery_status || record.driver_status || record.driverStatus || record.status || 'PENDING_DRIVER';
+    const outletStatus = record.outlet_status || record.outletStatus || '';
     const payload = {
       ...recordWithoutId,
       transferId: record.transferId || record.id || record.orderId,
+      transfer_id: record.transfer_id || record.transferId || record.id || record.orderId,
       orderId: record.orderId || record.transferId || record.id,
+      status: record.status || deliveryStatus,
+      delivery_status: deliveryStatus,
+      driver_status: record.driver_status || record.driverStatus || deliveryStatus,
+      driverStatus: record.driverStatus || record.driver_status || deliveryStatus,
+      outlet_status: outletStatus,
+      outletStatus: record.outletStatus || record.outlet_status || outletStatus,
+      source_type: record.source_type || record.sourceType || '',
+      sourceType: record.sourceType || record.source_type || '',
+      destinationType: record.destinationType || record.destination_type || '',
+      destination_type: record.destination_type || record.destinationType || '',
+      destinationId,
+      destination_id: destinationId,
       items,
       xfers: record.xfers || items,
       originalRemarks: record.remarks || ''
     };
 
     return {
-      outlet_id: record.destinationOutletId || record.outletId || record.outlet || '',
-      outlet_name: record.destinationOutletName || record.outletName || record.outlet || '',
+      outlet_id: dbOutletId,
+      outlet_name: dbOutletName,
       driver: record.driverName || record.driver || '',
       total_boxes: getTotalBoxes(record),
-      delivery_status: record.delivery_status || record.status || 'PENDING_DRIVER',
-      outlet_status: record.outlet_status || record.outletStatus || '',
+      delivery_status: deliveryStatus,
+      outlet_status: outletStatus,
       remarks: JSON.stringify(payload),
       admin_reply: record.adminReply || record.admin_reply || ''
     };
@@ -89,8 +121,8 @@
       outlet_name: payload.outlet_name,
       driver: payload.driver,
       total_boxes: payload.total_boxes,
-      delivery_status: 'PENDING_DRIVER',
-      outlet_status: 'PENDING_OUTLET',
+      delivery_status: payload.delivery_status || 'PENDING_DRIVER',
+      outlet_status: payload.outlet_status || 'PENDING_OUTLET',
       remarks: payload.remarks,
       admin_reply: payload.admin_reply
     };
@@ -109,13 +141,24 @@
       ...payload,
       id,
       transferId,
+      transfer_id: payload.transfer_id || transferId,
       orderId: payload.orderId || transferId,
-      outletId: payload.outletId || row.outlet_id || transferId,
+      outletId: payload.outletId || payload.outlet_id || row.outlet_id || transferId,
       outlet_id: row.outlet_id,
       outletName: payload.outletName || row.outlet_name,
-      destinationOutletId: payload.destinationOutletId || row.outlet_id,
-      destinationOutletName: payload.destinationOutletName || row.outlet_name,
+      outlet_name: row.outlet_name,
+      sourceType: payload.sourceType || payload.source_type || '',
+      source_type: payload.source_type || payload.sourceType || '',
+      destinationType: payload.destinationType || payload.destination_type || '',
+      destination_type: payload.destination_type || payload.destinationType || '',
+      destinationId: payload.destinationId || payload.destination_id || payload.destinationOutletId || row.outlet_id,
+      destination_id: payload.destination_id || payload.destinationId || payload.destinationOutletId || row.outlet_id,
+      destinationOutletId: payload.destinationOutletId || (String(payload.destinationType || payload.destination_type || '').toUpperCase() === 'OUTLET' ? row.outlet_id : ''),
+      destinationOutletName: payload.destinationOutletName || (String(payload.destinationType || payload.destination_type || '').toUpperCase() === 'OUTLET' ? row.outlet_name : ''),
+      destinationName: payload.destinationName || row.outlet_name,
       driverName: payload.driverName || row.driver,
+      driver_status: payload.driver_status || payload.driverStatus || row.delivery_status,
+      driverStatus: payload.driverStatus || payload.driver_status || row.delivery_status,
       totalBoxes: payload.totalBoxes || row.total_boxes,
       status: row.delivery_status || payload.delivery_status || payload.outlet_status || payload.outletStatus,
       delivery_status: row.delivery_status,

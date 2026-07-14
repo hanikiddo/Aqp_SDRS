@@ -154,12 +154,17 @@ function collectDashboardOrders() {
 
 function calculateDashboardStats(orders = []) {
     const list = Array.isArray(orders) ? orders : [];
+    const pendingDriverStatuses = ['PENDING_DRIVER', 'CREATED', 'PENDING', 'READY_FOR_PICKUP'];
+    const pendingDestinationStatuses = ['PENDING_OUTLET', 'PENDING_WAREHOUSE', 'PENDING_DESTINATION', 'IN_TRANSIT'];
+    const verifiedDriverStatuses = ['VERIFIED_BY_DRIVER', 'DRIVER_VERIFIED', 'IN_TRANSIT'];
 
     const total = list.length;
-    const driverPending = list.filter((order) => normalizeStatus(order.delivery_status) === 'PENDING_DRIVER').length;
+    const driverPending = list.filter((order) =>
+        pendingDriverStatuses.includes(normalizeStatus(order.delivery_status || order.driver_status || order.driverStatus || order.status))
+    ).length;
     const outletPending = list.filter((order) =>
-        normalizeStatus(order.delivery_status || order.status) === 'VERIFIED_BY_DRIVER' &&
-        normalizeStatus(order.outlet_status || order.outletStatus) === 'PENDING_OUTLET'
+        verifiedDriverStatuses.includes(normalizeStatus(order.delivery_status || order.driver_status || order.driverStatus || order.status)) &&
+        pendingDestinationStatuses.includes(normalizeStatus(order.outlet_status || order.outletStatus))
     ).length;
     const completed = list.filter((order) =>
         normalizeStatus(order.delivery_status || order.status) === 'COMPLETED' ||
@@ -197,6 +202,7 @@ async function loadDashboardStats(fallbackOrders = null) {
     }
 
     const stats = calculateDashboardStats(records);
+    console.log("[DASHBOARD RECORD COUNT]", records.length);
     if (source === 'supabase') {
         console.log('[DASHBOARD USING SUPABASE ONLY]', {
             totalRecords: records.length,

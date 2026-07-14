@@ -157,6 +157,20 @@
       }
     }
 
+    function normalizeStatus(status) {
+      return String(status || '').trim().replace(/\s+/g, '_').toUpperCase();
+    }
+
+    function isOutletSenderOrder(order) {
+      const sourceType = normalizeStatus(order?.source_type || order?.sourceType);
+      return sourceType === 'OUTLET_SENDER' || sourceType === 'OUTLET';
+    }
+
+    function isDriverPendingRecord(order) {
+      const status = normalizeStatus(order?.delivery_status || order?.driver_status || order?.driverStatus || order?.status);
+      return ['PENDING_DRIVER', 'CREATED', 'READY_FOR_PICKUP', 'PENDING'].includes(status);
+    }
+
     function renderRemarksCard(order) {
       const remarksText = getOrderRemarks(order) || 'No remarks provided.';
       return `
@@ -171,14 +185,14 @@
     }
 
     function getTransferDisplayId(order) {
-      if (String(order.sourceType || '').toUpperCase() === 'OUTLET') {
+      if (isOutletSenderOrder(order)) {
         return order.routeLabel || order.displayTransferId || `${order.sourceOutletId || 'OUTLET'} -> ${order.destinationOutletId || 'WAREHOUSE'}`;
       }
       return order.displayTransferId || order.transferId || order.orderId || order.outletId || order.id || 'Unknown Transfer';
     }
 
     function getTransferDisplayName(order) {
-      if (String(order.sourceType || '').toUpperCase() === 'OUTLET') {
+      if (isOutletSenderOrder(order)) {
         return `${order.sourceOutletName || order.sourceOutletId || 'Source Outlet'} to ${order.destinationOutletName || order.destinationName || order.destinationOutletId || 'Destination'}`;
       }
       return order.outletName || order.outlet || 'Unknown Outlet';
@@ -196,10 +210,6 @@
       if (typeof value === 'number') return value;
       const parsed = new Date(value).getTime();
       return Number.isNaN(parsed) ? 0 : parsed;
-    }
-
-    function normalizeStatus(status) {
-      return String(status || '').trim().replace(/\s+/g, '_').toUpperCase();
     }
 
     function getOrderKey(order) {
@@ -221,6 +231,7 @@
       const records = await window.SDRSSupabase.safeCall('[SUPABASE] load driver records', () => window.SDRSSupabase.fetchDeliveryRecords());
       if (!Array.isArray(records)) return;
       console.log("DRIVER RECORDS:", records);
+      console.log("[DRIVER OUTLET-SENDER RECORDS]", records.filter(record => isOutletSenderOrder(record)));
       console.log("DRIVER REMARKS LOCATIONS:", records.map(record => ({
         transferId: record.transferId || record.orderId || record.id || record.outletId,
         remarks: record.remarks,
@@ -228,7 +239,7 @@
         metaRemarks: record.meta?.remarks || record.meta?.originalRemarks,
         rawRemarks: record.raw?.remarks || record.supabaseRow?.remarks
       })));
-      const pendingRecords = records.filter(order => normalizeStatus(order.delivery_status) === 'PENDING_DRIVER');
+      const pendingRecords = records.filter(isDriverPendingRecord);
       const historyRecords = records.filter(order => ['VERIFIED_BY_DRIVER', 'COMPLETED', 'REJECTED'].includes(normalizeStatus(order.delivery_status)));
       const manager = window.SDRSStateManager;
       if (manager) {
@@ -263,6 +274,11 @@
       console.log('verifyOrder: found order', orderKey, 'status:', order.status);
       const now = new Date();
       const verifiedAt = now.toISOString();
+      const destinationType = normalizeStatus(order.destinationType || order.destination_type);
+      const isWarehouseDestination = destinationType === 'WAREHOUSE';
+      const destinationId = order.destinationId || order.destination_id || order.destinationOutletId || (isWarehouseDestination ? 'WAREHOUSE' : '');
+      const destinationName = order.destinationName || order.destinationOutletName || (isWarehouseDestination ? 'Warehouse' : '');
+      const nextOutletStatus = isWarehouseDestination ? 'PENDING_WAREHOUSE' : 'PENDING_OUTLET';
 
       const updatedOrder = {
         ...order,
@@ -271,10 +287,11 @@
         status: 'VERIFIED_BY_DRIVER',
         delivery_status: 'VERIFIED_BY_DRIVER',
         driverStatus: 'VERIFIED_BY_DRIVER',
-        outletStatus: 'PENDING_OUTLET',
-        outlet_status: 'PENDING_OUTLET',
-        outletId: order.destinationOutletId || order.outletId || order.outlet_id || order.transferId,
-        outletName: order.destinationOutletName || order.outletName,
+        driver_status: 'VERIFIED_BY_DRIVER',
+        outletStatus: nextOutletStatus,
+        outlet_status: nextOutletStatus,
+        outletId: isWarehouseDestination ? (destinationId || 'WAREHOUSE') : (order.destinationOutletId || order.outletId || order.outlet_id || order.transferId),
+        outletName: isWarehouseDestination ? (destinationName || 'Warehouse') : (order.destinationOutletName || order.outletName),
         verifiedAt,
         verifiedTimestamp: now.getTime(),
         timestamps: {
@@ -293,16 +310,17 @@
       const incomingOrder = {
         ...updatedOrder,
         transferId: updatedOrder.transferId || updatedOrder.orderId || updatedOrder.outletId || updatedOrder.outlet_id || updatedOrder.id,
-        outletId: updatedOrder.destinationOutletId || updatedOrder.outletId || updatedOrder.outlet_id || updatedOrder.transferId,
-        outletName: updatedOrder.destinationOutletName || updatedOrder.outletName || updatedOrder.outlet || '',
+        outletId: isWarehouseDestination ? (destinationId || 'WAREHOUSE') : (updatedOrder.destinationOutletId || updatedOrder.outletId || updatedOrder.outlet_id || updatedOrder.transferId),
+        outletName: isWarehouseDestination ? (destinationName || 'Warehouse') : (updatedOrder.destinationOutletName || updatedOrder.outletName || updatedOrder.outlet || ''),
         xferItems: verifiedItems,
         items: updatedOrder.items || verifiedItems,
         xfers: updatedOrder.xfers || verifiedItems,
         totalBoxes: updatedOrder.totalBoxes || verifiedItems.reduce((sum, item) => sum + (parseInt(item.totalBoxes || item.qty, 10) || 0), 0),
         status: 'VERIFIED_BY_DRIVER',
         delivery_status: 'VERIFIED_BY_DRIVER',
-        outletStatus: 'PENDING_OUTLET',
-        outlet_status: 'PENDING_OUTLET'
+        driver_status: 'VERIFIED_BY_DRIVER',
+        outletStatus: nextOutletStatus,
+        outlet_status: nextOutletStatus
       };
       const historyRecord = {
         id: incomingOrder.transferId,
@@ -310,6 +328,7 @@
         outletId: incomingOrder.outletId,
         outletName: incomingOrder.outletName,
         sourceType: updatedOrder.sourceType,
+        source_type: updatedOrder.source_type,
         sourceOutletId: updatedOrder.sourceOutletId,
         sourceOutletName: updatedOrder.sourceOutletName,
         destinationType: updatedOrder.destinationType,
@@ -322,8 +341,9 @@
         date: verifiedAt,
         status: 'VERIFIED_BY_DRIVER',
         delivery_status: 'VERIFIED_BY_DRIVER',
-        outletStatus: 'PENDING_OUTLET',
-        outlet_status: 'PENDING_OUTLET',
+        driver_status: 'VERIFIED_BY_DRIVER',
+        outletStatus: nextOutletStatus,
+        outlet_status: nextOutletStatus,
         xferItems: incomingOrder.xferItems,
         totalBoxes: incomingOrder.totalBoxes
       };
@@ -352,8 +372,10 @@
         console.log('verifyOrder: removed from driverQueue');
         manager.appendState('driverHistory', historyRecord);
         console.log('verifyOrder: added to driverHistory');
-        manager.appendState('outletIncomingQueue', incomingOrder);
-        console.log('verifyOrder: pushed to outletIncomingQueue');
+        if (!isWarehouseDestination) {
+          manager.appendState('outletIncomingQueue', incomingOrder);
+          console.log('verifyOrder: pushed to outletIncomingQueue');
+        }
         manager.updateState('warehouseTransfers', (orders) => orders.map((item) => {
           if (getOrderKey(item) === orderKey) {
             return { ...item, ...incomingOrder };
@@ -371,7 +393,9 @@
             ...incomingOrder,
             status: 'VERIFIED_BY_DRIVER',
             driverStatus: 'VERIFIED_BY_DRIVER',
-            outletStatus: 'PENDING_OUTLET'
+            driver_status: 'VERIFIED_BY_DRIVER',
+            outletStatus: nextOutletStatus,
+            outlet_status: nextOutletStatus
           };
           return next;
         });
@@ -379,7 +403,9 @@
       } else {
         window.sdrsState.driverQueue = (window.sdrsState.driverQueue || []).filter(task => getOrderKey(task) !== orderKey);
         window.sdrsState.driverHistory = [historyRecord, ...(window.sdrsState.driverHistory || [])];
-        window.sdrsState.outletIncomingQueue = [...(window.sdrsState.outletIncomingQueue || []), incomingOrder];
+        if (!isWarehouseDestination) {
+          window.sdrsState.outletIncomingQueue = [...(window.sdrsState.outletIncomingQueue || []), incomingOrder];
+        }
         window.sdrsState.warehouseTransfers = (window.sdrsState.warehouseTransfers || []).map((item) => {
           if (getOrderKey(item) === orderKey) {
             return { ...item, ...incomingOrder };
@@ -398,7 +424,7 @@
 
     function isDriverPendingStatus(status) {
       const normalized = normalizeStatus(status);
-      return normalized === 'PENDING_DRIVER';
+      return ['PENDING_DRIVER', 'CREATED', 'READY_FOR_PICKUP', 'PENDING'].includes(normalized);
     }
 
     function renderDriverTasks() {
@@ -409,7 +435,7 @@
 
       const manager = window.SDRSStateManager;
       const orders = manager ? manager.getState('driverQueue') : (window.sdrsState?.driverQueue || JSON.parse(localStorage.getItem('driverQueue') || '[]'));
-      const pendingOrders = (orders || []).filter(order => isDriverPendingStatus(order.delivery_status));
+      const pendingOrders = (orders || []).filter(isDriverPendingRecord);
       taskCount.textContent = `${pendingOrders.length} Task${pendingOrders.length !== 1 ? 's' : ''}`;
 
       if (pendingOrders.length === 0) {

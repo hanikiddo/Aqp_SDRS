@@ -62,7 +62,7 @@
           </div>
           <div class="rounded-2xl bg-white border border-slate-200 p-4 sm:col-span-2">
             <p class="text-xs uppercase tracking-wide text-slate-500 mb-2">Status</p>
-            <p id="status" class="text-base font-extrabold text-amber-700 break-words">OUTLET_TRANSFER_PENDING</p>
+            <p id="status" class="text-base font-extrabold text-amber-700 break-words">PENDING_DRIVER</p>
           </div>
         </div>
       </div>
@@ -97,7 +97,7 @@
         document.getElementById('toDestination').textContent = transfer.destinationName || transfer.destinationOutletName || transfer.destinationType || '--';
         document.getElementById('itemName').textContent = transfer.xfer || transfer.items?.[0]?.name || transfer.items?.[0]?.xferNumber || '--';
         document.getElementById('totalBoxes').textContent = transfer.totalBoxes || transfer.items?.[0]?.totalBoxes || '--';
-        document.getElementById('status').textContent = transfer.status || 'OUTLET_TRANSFER_PENDING';
+        document.getElementById('status').textContent = transfer.delivery_status || transfer.driver_status || transfer.status || 'PENDING_DRIVER';
       }
 
       if (window.lucide) window.lucide.createIcons();
