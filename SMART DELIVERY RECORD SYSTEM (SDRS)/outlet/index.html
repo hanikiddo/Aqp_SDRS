@@ -228,14 +228,17 @@
         renderOrders();
         return;
       }
-      const expectedOutletStatus = String(outletId || '').trim().toUpperCase() === 'OTHER'
-        ? 'PENDING_WAREHOUSE'
-        : 'PENDING_OUTLET';
+      const isOtherOutlet = String(outletId || '').trim().toUpperCase() === 'OTHER';
+      const expectedOutletStatuses = isOtherOutlet
+        ? ['PENDING_OUTLET', 'PENDING_WAREHOUSE']
+        : ['PENDING_OUTLET'];
       const filters = {
         delivery_status: 'VERIFIED_BY_DRIVER',
-        outlet_status: expectedOutletStatus,
         outlet_id: outletId
       };
+      if (!isOtherOutlet) {
+        filters.outlet_status = expectedOutletStatuses[0];
+      }
       console.log('[OUTLET RECEIVER FILTER]', filters);
       const records = await window.SDRSSupabase.safeCall('[SUPABASE] load outlet queue', () => window.SDRSSupabase.fetchDeliveryRecords(filters));
       if (!Array.isArray(records)) {
@@ -245,7 +248,7 @@
       console.log('[OUTLET RECEIVER RECORDS]', records);
       const rebuiltQueue = records
         .filter(order => normalizeStatus(order.delivery_status || order.status) === 'VERIFIED_BY_DRIVER')
-        .filter(order => normalizeStatus(order.outlet_status || order.outletStatus) === expectedOutletStatus)
+        .filter(order => expectedOutletStatuses.includes(normalizeStatus(order.outlet_status || order.outletStatus)))
         .filter(order => orderMatchesOutlet(order, outletId))
         .map(normalizeSupabaseIncomingOrder);
 
@@ -281,15 +284,15 @@
       container.innerHTML = '';
 
       const outletId = getCurrentOutletId();
-      const expectedOutletStatus = String(outletId || '').trim().toUpperCase() === 'OTHER'
-        ? 'PENDING_WAREHOUSE'
-        : 'PENDING_OUTLET';
+      const expectedOutletStatuses = String(outletId || '').trim().toUpperCase() === 'OTHER'
+        ? ['PENDING_OUTLET', 'PENDING_WAREHOUSE']
+        : ['PENDING_OUTLET'];
       const manager = window.SDRSStateManager;
       const incomingOrders = manager ? manager.getState('outletIncomingQueue') : JSON.parse(localStorage.getItem('outletIncomingQueue') || '[]');
       const arrivingOrders = (incomingOrders || []).filter(order => {
         return orderMatchesOutlet(order, outletId) &&
                normalizeStatus(order.delivery_status || order.status) === 'VERIFIED_BY_DRIVER' &&
-               normalizeStatus(order.outlet_status || order.outletStatus || expectedOutletStatus) === expectedOutletStatus;
+               expectedOutletStatuses.includes(normalizeStatus(order.outlet_status || order.outletStatus || expectedOutletStatuses[0]));
       });
 
       countEl.textContent = arrivingOrders.length;
