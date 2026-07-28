@@ -224,11 +224,11 @@
         minute: '2-digit'
       });
       const id = `OTS-${now.getTime()}`;
-      const destinationName = destinationType === 'Warehouse' ? 'Warehouse Sierra Perdana' : destinationOutlet.name;
-      const destinationId = destinationType === 'Warehouse' ? 'WH' : destinationOutlet.id;
+      const destinationName = destinationType === 'Warehouse' ? 'Klinik-klinik lain' : destinationOutlet.name;
+      const destinationId = destinationType === 'Warehouse' ? 'OTHER' : destinationOutlet.id;
       const routeLabel = destinationType === 'Outlet'
         ? `${sourceOutlet.id} -> ${destinationOutlet.id}`
-        : `${sourceOutlet.id} -> WH`;
+        : `${sourceOutlet.id} -> OTHER`;
       const item = {
         xferNumber: itemName,
         name: itemName,

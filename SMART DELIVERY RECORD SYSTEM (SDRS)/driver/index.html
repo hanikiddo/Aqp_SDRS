@@ -278,8 +278,8 @@
       const verifiedAt = now.toISOString();
       const destinationType = normalizeStatus(order.destinationType || order.destination_type);
       const isWarehouseDestination = destinationType === 'WAREHOUSE';
-      const destinationId = order.destinationId || order.destination_id || order.destinationOutletId || (isWarehouseDestination ? 'WH' : '');
-      const destinationName = order.destinationName || order.destinationOutletName || (isWarehouseDestination ? 'Warehouse Sierra Perdana' : '');
+      const destinationId = order.destinationId || order.destination_id || order.destinationOutletId || (isWarehouseDestination ? 'OTHER' : '');
+      const destinationName = order.destinationName || order.destinationOutletName || (isWarehouseDestination ? 'Klinik-klinik lain' : '');
       const nextOutletStatus = isWarehouseDestination ? 'PENDING_WAREHOUSE' : 'PENDING_OUTLET';
 
       const updatedOrder = {

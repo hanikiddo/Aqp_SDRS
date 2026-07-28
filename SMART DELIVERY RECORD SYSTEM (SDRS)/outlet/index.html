@@ -228,7 +228,7 @@
         renderOrders();
         return;
       }
-      const expectedOutletStatus = String(outletId || '').trim().toUpperCase() === 'WH'
+      const expectedOutletStatus = String(outletId || '').trim().toUpperCase() === 'OTHER'
         ? 'PENDING_WAREHOUSE'
         : 'PENDING_OUTLET';
       const filters = {
@@ -281,7 +281,7 @@
       container.innerHTML = '';
 
       const outletId = getCurrentOutletId();
-      const expectedOutletStatus = String(outletId || '').trim().toUpperCase() === 'WH'
+      const expectedOutletStatus = String(outletId || '').trim().toUpperCase() === 'OTHER'
         ? 'PENDING_WAREHOUSE'
         : 'PENDING_OUTLET';
       const manager = window.SDRSStateManager;
