@@ -314,6 +314,15 @@
           return String(order?.supabaseId || order?.dbId || order?.raw?.id || '').trim();
       }
 
+      function escapeAttribute(value) {
+          return String(value || '')
+              .replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+              .replace(/"/g, '&quot;')
+              .replace(/'/g, '&#39;');
+      }
+
       function getAdminNormalizedRecords(records = adminRecords) {
           return dedupeAdminRecords(records || []).map((record) => ({
               ...record,
@@ -514,15 +523,18 @@
                   outletLog = `Received ${order.receivedAt || ''}`;
               }
 
-              const isCompleted = normalized.category === 'completed';
               const statusBadge = getBadgeForStatus(normalized.badgeStatus);
               const recordId = getAdminOrderId(order);
               const supabaseId = getAdminSupabaseId(order);
-              const deleteButton = isCompleted
-                  ? `<button type="button" onclick="deleteOrder('${recordId}', '${supabaseId}')" class="text-red-600 hover:text-red-800 transition-colors" title="Delete record"><i data-lucide="trash-2" style="width:18px;height:18px;"></i></button>`
+              const escapedRecordId = escapeAttribute(recordId);
+              const escapedSupabaseId = escapeAttribute(supabaseId);
+              const deleteButton = recordId
+                  ? `<button type="button" data-record-id="${escapedRecordId}" data-supabase-id="${escapedSupabaseId}" class="delete-order-button text-red-600 hover:text-red-800 transition-colors" title="Delete record"><i data-lucide="trash-2" style="width:18px;height:18px;"></i></button>`
                   : `<span class="text-slate-400 opacity-50" title="Delete unavailable"><i data-lucide="trash-2" style="width:18px;height:18px;"></i></span>`;
 
-              const viewDetailsButton = `<button type="button" onclick="openOrderDetails('${recordId}')" class="text-teal hover:text-teal-800 transition-colors mr-3" title="View details"><i data-lucide="eye" style="width:18px;height:18px;"></i></button>`;
+              const viewDetailsButton = recordId
+                  ? `<button type="button" onclick="openOrderDetails('${escapedRecordId}')" class="text-teal hover:text-teal-800 transition-colors mr-3" title="View details"><i data-lucide="eye" style="width:18px;height:18px;"></i></button>`
+                  : `<span class="text-slate-400 opacity-50" title="View unavailable"><i data-lucide="eye" style="width:18px;height:18px;"></i></span>`;
 
               html += `
                   <tr class="border-b border-navy/5 hover:bg-slate-50 transition-colors ${normalized.category === 'issues' ? 'bg-red-50/50' : ''}">
@@ -548,6 +560,16 @@
           tbody.innerHTML = html;
 
           if (window.lucide) window.lucide.createIcons();
+          if (!tbody.dataset.deleteListenerAttached) {
+              tbody.dataset.deleteListenerAttached = 'true';
+              tbody.addEventListener('click', (event) => {
+                  const button = event.target.closest('.delete-order-button');
+                  if (!button) return;
+                  const recordId = button.dataset.recordId || '';
+                  const supabaseId = button.dataset.supabaseId || '';
+                  deleteOrder(recordId, supabaseId);
+              });
+          }
           notifyNewIssueOrders(orders);
       }
 
