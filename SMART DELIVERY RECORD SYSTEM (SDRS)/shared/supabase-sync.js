@@ -250,6 +250,33 @@
     return true;
   }
 
+  async function deleteDeliveryRecordById(id) {
+    if (!id) return null;
+    const rows = await request(`?id=eq.${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: { Prefer: 'return=minimal' }
+    });
+    return Array.isArray(rows) ? rows : null;
+  }
+
+  async function deleteDeliveryRecordByTransferId(transferId) {
+    if (!transferId) return null;
+    const rows = await request(`?transfer_id=eq.${encodeURIComponent(transferId)}`, {
+      method: 'DELETE',
+      headers: { Prefer: 'return=minimal' }
+    });
+    return Array.isArray(rows) ? rows : null;
+  }
+
+  async function deleteDeliveryRecord(identifier, options = {}) {
+    const normalizedIdentifier = String(identifier || '').trim();
+    if (!normalizedIdentifier) return null;
+    if (options.bySupabaseId) {
+      return deleteDeliveryRecordById(normalizedIdentifier);
+    }
+    return deleteDeliveryRecordByTransferId(normalizedIdentifier);
+  }
+
   async function saveDeliveryRecord(record) {
     const transferId = String(record?.transferId || record?.id || record?.orderId || '').trim();
     if (!transferId) return null;
@@ -320,6 +347,9 @@
   window.SDRSSupabase = {
     fetchDeliveryRecords,
     deleteAllDeliveryRecords,
+    deleteDeliveryRecord,
+    deleteDeliveryRecordById,
+    deleteDeliveryRecordByTransferId,
     saveDeliveryRecord,
     updateDeliveryRecord,
     updateDeliveryRecordByOutletId,

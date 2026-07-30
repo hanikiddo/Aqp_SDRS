@@ -310,6 +310,10 @@
           ).trim();
       }
 
+      function getAdminSupabaseId(order) {
+          return String(order?.supabaseId || order?.dbId || order?.raw?.id || '').trim();
+      }
+
       function getAdminNormalizedRecords(records = adminRecords) {
           return dedupeAdminRecords(records || []).map((record) => ({
               ...record,
@@ -415,31 +419,64 @@
           syncDashboardStats();
       }
 
-      window.deleteOrder = function(id) {
-          const normalizedId = String(id || '').trim();
-          if (!normalizedId) {
+      window.deleteOrder = async function(recordId, supabaseId) {
+          const normalizedRecordId = String(recordId || '').trim();
+          const normalizedSupabaseId = String(supabaseId || '').trim();
+          if (!normalizedRecordId) {
               showToast('Unable to delete record: invalid order identifier.', false);
               return;
           }
 
-          const manager = window.SDRSStateManager;
-          if (manager) {
-              ['warehouseTransfers', 'driverQueue', 'driverHistory', 'outletIncomingQueue', 'outletHistory', 'adminGlobalPipeline'].forEach((key) => {
-                  manager.removeState(key, normalizedId);
-              });
-              manager.syncAllModules();
-          } else {
-              const updated = getOrders().filter((o) => getAdminOrderId(o) !== normalizedId);
-              const fallbackKeys = ['adminGlobalPipeline', 'sdrs_main_orders', 'sdrs_records', 'sdrs_orders', 'orders', 'warehouse_xfer_data'];
-              fallbackKeys.forEach((key) => localStorage.setItem(key, JSON.stringify(updated)));
-              if (window.sdrsOrders) {
-                  window.sdrsOrders = updated;
-              }
+          if (!window.confirm('Confirm delete this pipeline record? This action cannot be undone.')) {
+              return;
           }
 
-          renderTable();
-          updateDashboardStats();
-          showToast('Record deleted successfully', true);
+          try {
+              if (window.SDRSSupabase && typeof window.SDRSSupabase.deleteDeliveryRecord === 'function') {
+                  if (normalizedSupabaseId) {
+                      await window.SDRSSupabase.safeCall(
+                          '[SUPABASE] delete delivery record by primary key',
+                          () => window.SDRSSupabase.deleteDeliveryRecord(normalizedSupabaseId, { bySupabaseId: true })
+                      );
+                  } else {
+                      await window.SDRSSupabase.safeCall(
+                          '[SUPABASE] delete delivery record by transfer id',
+                          () => window.SDRSSupabase.deleteDeliveryRecord(normalizedRecordId)
+                      );
+                  }
+              }
+
+              adminRecords = adminRecords.filter((order) => {
+                  const orderRecordId = getAdminOrderId(order);
+                  const orderSupabaseId = getAdminSupabaseId(order);
+                  return orderRecordId !== normalizedRecordId && orderSupabaseId !== normalizedSupabaseId;
+              });
+
+              const manager = window.SDRSStateManager;
+              if (manager) {
+                  ['warehouseTransfers', 'driverQueue', 'driverHistory', 'outletIncomingQueue', 'outletHistory', 'adminGlobalPipeline'].forEach((key) => {
+                      manager.removeState(key, normalizedRecordId);
+                  });
+                  manager.syncAllModules();
+              } else {
+                  const updated = getOrders().filter((o) => getAdminOrderId(o) !== normalizedRecordId);
+                  const fallbackKeys = ['adminGlobalPipeline', 'sdrs_main_orders', 'sdrs_records', 'sdrs_orders', 'orders', 'warehouse_xfer_data'];
+                  fallbackKeys.forEach((key) => localStorage.setItem(key, JSON.stringify(updated)));
+                  if (window.sdrsOrders) {
+                      window.sdrsOrders = updated;
+                  }
+              }
+
+              renderTable();
+              updateDashboardStats();
+              if (typeof refreshOpenOrderDetails === 'function') {
+                  refreshOpenOrderDetails();
+              }
+              showToast('Record deleted successfully', true);
+          } catch (error) {
+              console.error('[ADMIN DELETE] failed', error);
+              showToast('Delete failed. Check console for details.', false);
+          }
       };
 
       function renderTable() {
@@ -480,8 +517,9 @@
               const isCompleted = normalized.category === 'completed';
               const statusBadge = getBadgeForStatus(normalized.badgeStatus);
               const recordId = getAdminOrderId(order);
+              const supabaseId = getAdminSupabaseId(order);
               const deleteButton = isCompleted
-                  ? `<button type="button" onclick="deleteOrder('${recordId}')" class="text-red-600 hover:text-red-800 transition-colors" title="Delete record"><i data-lucide="trash-2" style="width:18px;height:18px;"></i></button>`
+                  ? `<button type="button" onclick="deleteOrder('${recordId}', '${supabaseId}')" class="text-red-600 hover:text-red-800 transition-colors" title="Delete record"><i data-lucide="trash-2" style="width:18px;height:18px;"></i></button>`
                   : `<span class="text-slate-400 opacity-50" title="Delete unavailable"><i data-lucide="trash-2" style="width:18px;height:18px;"></i></span>`;
 
               const viewDetailsButton = `<button type="button" onclick="openOrderDetails('${recordId}')" class="text-teal hover:text-teal-800 transition-colors mr-3" title="View details"><i data-lucide="eye" style="width:18px;height:18px;"></i></button>`;
