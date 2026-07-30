@@ -207,6 +207,33 @@
       return String(order.transferId || order.orderId || order.id || order.outletId || order.outlet_id || '').trim();
     }
 
+    function getOrderDedupeKey(order) {
+      const items = getOrderItems(order)
+        .map(item => String(item.xferNumber || item.xferNo || item.name || item.sku || '').trim().toUpperCase())
+        .filter(Boolean)
+        .sort()
+        .join('|');
+      const route = [
+        order.sourceOutletId,
+        order.sourceOutletName,
+        order.destinationOutletId || order.destinationId || order.destination_id || order.outlet_id || order.outletId,
+        order.destinationOutletName || order.destinationName || order.outletName
+      ].map(value => String(value || '').trim().toUpperCase()).join('|');
+      const status = normalizeStatus(order.delivery_status || order.outlet_status || order.outletStatus || order.status);
+      const boxes = String(getOrderTotalBoxes(order, getOrderItems(order)));
+      return [route, items || getOrderKey(order), boxes, status].join('::');
+    }
+
+    function dedupeOrders(orders) {
+      const map = new Map();
+      (orders || []).forEach(order => {
+        if (!order || typeof order !== 'object') return;
+        const key = getOrderDedupeKey(order);
+        map.set(key, { ...(map.get(key) || {}), ...order });
+      });
+      return Array.from(map.values());
+    }
+
     function normalizeSupabaseIncomingOrder(order) {
       const outletId = order.outletId || order.outlet_id || order.destinationOutletId || order.transferId || '';
       const transferId = order.transferId || order.orderId || order.outlet_id || outletId || order.id;
@@ -246,11 +273,11 @@
         return;
       }
       console.log('[OUTLET RECEIVER RECORDS]', records);
-      const rebuiltQueue = records
+      const rebuiltQueue = dedupeOrders(records
         .filter(order => normalizeStatus(order.delivery_status || order.status) === 'VERIFIED_BY_DRIVER')
         .filter(order => expectedOutletStatuses.includes(normalizeStatus(order.outlet_status || order.outletStatus)))
         .filter(order => orderMatchesOutlet(order, outletId))
-        .map(normalizeSupabaseIncomingOrder);
+        .map(normalizeSupabaseIncomingOrder));
 
       const manager = window.SDRSStateManager;
       if (manager) {
@@ -258,7 +285,7 @@
         const otherLocal = localOrders.filter(order => !orderMatchesOutlet(order, outletId));
         const merged = new Map();
         [...otherLocal, ...rebuiltQueue].forEach(order => {
-          const key = getOrderKey(order);
+          const key = getOrderDedupeKey(order);
           if (key) merged.set(key, order);
         });
         manager.setState('outletIncomingQueue', Array.from(merged.values()));
@@ -267,7 +294,7 @@
         const otherLocal = localOrders.filter(order => !orderMatchesOutlet(order, outletId));
         const merged = new Map();
         [...otherLocal, ...rebuiltQueue].forEach(order => {
-          const key = getOrderKey(order);
+          const key = getOrderDedupeKey(order);
           if (key) merged.set(key, order);
         });
         window.sdrsState.outletIncomingQueue = Array.from(merged.values());
@@ -289,11 +316,11 @@
         : ['PENDING_OUTLET'];
       const manager = window.SDRSStateManager;
       const incomingOrders = manager ? manager.getState('outletIncomingQueue') : JSON.parse(localStorage.getItem('outletIncomingQueue') || '[]');
-      const arrivingOrders = (incomingOrders || []).filter(order => {
+      const arrivingOrders = dedupeOrders((incomingOrders || []).filter(order => {
         return orderMatchesOutlet(order, outletId) &&
                normalizeStatus(order.delivery_status || order.status) === 'VERIFIED_BY_DRIVER' &&
                expectedOutletStatuses.includes(normalizeStatus(order.outlet_status || order.outletStatus || expectedOutletStatuses[0]));
-      });
+      }));
 
       countEl.textContent = arrivingOrders.length;
       renderHistory(outletId);

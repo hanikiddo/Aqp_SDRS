@@ -216,6 +216,36 @@
       return String(order?.transferId || order?.orderId || order?.outletId || order?.outlet_id || order?.id || '').trim();
     }
 
+    function getOrderDedupeKey(order) {
+      const items = getOrderItems(order)
+        .map(item => String(item.xferNumber || item.xferNo || item.name || item.sku || '').trim().toUpperCase())
+        .filter(Boolean)
+        .sort()
+        .join('|');
+      const route = [
+        order?.sourceOutletId,
+        order?.sourceOutletName,
+        order?.destinationOutletId || order?.destinationId || order?.destination_id || order?.outlet_id || order?.outletId,
+        order?.destinationOutletName || order?.destinationName || order?.outletName
+      ].map(value => String(value || '').trim().toUpperCase()).join('|');
+      const status = normalizeStatus(order?.delivery_status || order?.driver_status || order?.driverStatus || order?.status);
+      const boxes = String(order?.totalBoxes || order?.total_boxes || getOrderItems(order).reduce((sum, item) => sum + (parseInt(item.totalBoxes || item.qty, 10) || 0), 0));
+      return [route, items || getOrderKey(order), boxes, status].join('::');
+    }
+
+    function dedupeOrders(orders) {
+      const map = new Map();
+      (orders || []).forEach(order => {
+        if (!order || typeof order !== 'object') return;
+        const key = getOrderDedupeKey(order);
+        const previous = map.get(key);
+        if (!previous || getHistorySortTime(order) >= getHistorySortTime(previous)) {
+          map.set(key, order);
+        }
+      });
+      return Array.from(map.values());
+    }
+
     function mergeOrders(primary, fallback) {
       const map = new Map();
       [...(fallback || []), ...(primary || [])].forEach((order) => {
@@ -240,9 +270,9 @@
         metaRemarks: record.meta?.remarks || record.meta?.originalRemarks,
         rawRemarks: record.raw?.remarks || record.supabaseRow?.remarks
       })));
-      const pendingRecords = records.filter(isDriverPendingRecord);
+      const pendingRecords = dedupeOrders(records.filter(isDriverPendingRecord));
       console.log('[DRIVER PENDING RECORDS]', pendingRecords);
-      const historyRecords = records.filter(order => ['VERIFIED_BY_DRIVER', 'COMPLETED', 'REJECTED'].includes(normalizeStatus(order.delivery_status)));
+      const historyRecords = dedupeOrders(records.filter(order => ['VERIFIED_BY_DRIVER', 'COMPLETED', 'REJECTED'].includes(normalizeStatus(order.delivery_status))));
       const manager = window.SDRSStateManager;
       if (manager) {
         manager.setState('driverQueue', pendingRecords);
@@ -433,7 +463,7 @@
 
       const manager = window.SDRSStateManager;
       const orders = manager ? manager.getState('driverQueue') : (window.sdrsState?.driverQueue || JSON.parse(localStorage.getItem('driverQueue') || '[]'));
-      const pendingOrders = (orders || []).filter(isDriverPendingRecord);
+      const pendingOrders = dedupeOrders((orders || []).filter(isDriverPendingRecord));
       taskCount.textContent = `${pendingOrders.length} Task${pendingOrders.length !== 1 ? 's' : ''}`;
 
       if (pendingOrders.length === 0) {

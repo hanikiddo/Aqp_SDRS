@@ -296,11 +296,52 @@
           return { category: 'other', status: statuses[0] || 'PENDING', badgeStatus: statuses[0] || 'PENDING', statuses };
       }
 
+      function getAdminOrderId(order) {
+          return String(
+              order?.id ||
+              order?.transferId ||
+              order?.orderId ||
+              order?.outletId ||
+              order?.destinationOutletId ||
+              order?.destinationId ||
+              order?.transfer_id ||
+              order?.order_id ||
+              ''
+          ).trim();
+      }
+
       function getAdminNormalizedRecords(records = adminRecords) {
-          return (records || []).map((record) => ({
+          return dedupeAdminRecords(records || []).map((record) => ({
               ...record,
               normalizedStatus: normalizeDeliveryStatus(record)
           }));
+      }
+
+      function getAdminDedupeKey(record) {
+          const items = getOrderItems(record)
+              .map(item => String(item.xferNumber || item.xferNo || item.name || item.sku || '').trim().toUpperCase())
+              .filter(Boolean)
+              .sort()
+              .join('|');
+          const route = [
+              record.sourceOutletId,
+              record.sourceOutletName,
+              record.destinationOutletId || record.destinationId || record.destination_id || record.outlet_id || record.outletId,
+              record.destinationOutletName || record.destinationName || record.outletName
+          ].map(value => String(value || '').trim().toUpperCase()).join('|');
+          const status = getRecordStatusValues(record).join('|');
+          const boxes = String(getOrderTotalBoxes(record));
+          return [route, items || record.transferId || record.orderId || record.id, boxes, status].join('::');
+      }
+
+      function dedupeAdminRecords(records) {
+          const map = new Map();
+          (records || []).forEach(record => {
+              if (!record || typeof record !== 'object') return;
+              const key = getAdminDedupeKey(record);
+              map.set(key, { ...(map.get(key) || {}), ...record });
+          });
+          return Array.from(map.values());
       }
 
       function calculateAdminKpiStats(normalizedRecords) {
@@ -375,17 +416,27 @@
       }
 
       window.deleteOrder = function(id) {
+          const normalizedId = String(id || '').trim();
+          if (!normalizedId) {
+              showToast('Unable to delete record: invalid order identifier.', false);
+              return;
+          }
+
           const manager = window.SDRSStateManager;
           if (manager) {
               ['warehouseTransfers', 'driverQueue', 'driverHistory', 'outletIncomingQueue', 'outletHistory', 'adminGlobalPipeline'].forEach((key) => {
-                  manager.removeState(key, id);
+                  manager.removeState(key, normalizedId);
               });
               manager.syncAllModules();
           } else {
-              const updated = getOrders().filter(o => String(o.id) !== String(id));
-              localStorage.setItem('adminGlobalPipeline', JSON.stringify(updated));
-              localStorage.setItem('sdrs_main_orders', JSON.stringify(updated));
+              const updated = getOrders().filter((o) => getAdminOrderId(o) !== normalizedId);
+              const fallbackKeys = ['adminGlobalPipeline', 'sdrs_main_orders', 'sdrs_records', 'sdrs_orders', 'orders', 'warehouse_xfer_data'];
+              fallbackKeys.forEach((key) => localStorage.setItem(key, JSON.stringify(updated)));
+              if (window.sdrsOrders) {
+                  window.sdrsOrders = updated;
+              }
           }
+
           renderTable();
           updateDashboardStats();
           showToast('Record deleted successfully', true);
@@ -428,11 +479,12 @@
 
               const isCompleted = normalized.category === 'completed';
               const statusBadge = getBadgeForStatus(normalized.badgeStatus);
+              const recordId = getAdminOrderId(order);
               const deleteButton = isCompleted
-                  ? `<button type="button" onclick="deleteOrder('${order.id}')" class="text-red-600 hover:text-red-800 transition-colors" title="Delete record"><i data-lucide="trash-2" style="width:18px;height:18px;"></i></button>`
+                  ? `<button type="button" onclick="deleteOrder('${recordId}')" class="text-red-600 hover:text-red-800 transition-colors" title="Delete record"><i data-lucide="trash-2" style="width:18px;height:18px;"></i></button>`
                   : `<span class="text-slate-400 opacity-50" title="Delete unavailable"><i data-lucide="trash-2" style="width:18px;height:18px;"></i></span>`;
 
-              const viewDetailsButton = `<button type="button" onclick="openOrderDetails('${order.id}')" class="text-teal hover:text-teal-800 transition-colors mr-3" title="View details"><i data-lucide="eye" style="width:18px;height:18px;"></i></button>`;
+              const viewDetailsButton = `<button type="button" onclick="openOrderDetails('${recordId}')" class="text-teal hover:text-teal-800 transition-colors mr-3" title="View details"><i data-lucide="eye" style="width:18px;height:18px;"></i></button>`;
 
               html += `
                   <tr class="border-b border-navy/5 hover:bg-slate-50 transition-colors ${normalized.category === 'issues' ? 'bg-red-50/50' : ''}">
@@ -590,21 +642,21 @@
               )
           );
           adminUsesSupabase = true;
-          adminRecords = records;
+          adminRecords = dedupeAdminRecords(records);
           const normalizedRecords = getAdminNormalizedRecords(records);
           const stats = calculateAdminKpiStats(normalizedRecords);
           console.log("[ADMIN NORMALIZED RECORDS]", normalizedRecords);
           console.log("[ADMIN KPI STATS]", stats);
           const manager = window.SDRSStateManager;
           if (manager) {
-              manager.setState('adminGlobalPipeline', records);
+              manager.setState('adminGlobalPipeline', adminRecords);
               manager.setState('warehouseTransfers', []);
               manager.setState('driverQueue', []);
               manager.setState('driverHistory', []);
               manager.setState('outletIncomingQueue', []);
               manager.setState('outletHistory', []);
           } else {
-              localStorage.setItem('adminGlobalPipeline', JSON.stringify(records));
+              localStorage.setItem('adminGlobalPipeline', JSON.stringify(adminRecords));
           }
           if (records.length === 0) {
               [
