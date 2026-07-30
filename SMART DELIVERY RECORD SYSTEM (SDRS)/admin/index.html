@@ -297,21 +297,21 @@
       }
 
       function getAdminOrderId(order) {
-          return String(
-              order?.id ||
-              order?.transferId ||
-              order?.orderId ||
-              order?.outletId ||
-              order?.destinationOutletId ||
-              order?.destinationId ||
-              order?.transfer_id ||
-              order?.order_id ||
-              ''
-          ).trim();
+          const explicitId = order?.transferId || order?.transfer_id || order?.orderId || order?.order_id || order?.outletId || order?.destinationOutletId || order?.destinationId;
+          const normalizedExplicitId = String(explicitId || '').trim();
+          if (normalizedExplicitId) {
+              return normalizedExplicitId;
+          }
+          const fallbackId = String(order?.id || '').trim();
+          if (fallbackId && !/^\d+$/.test(fallbackId)) {
+              return fallbackId;
+          }
+          return '';
       }
 
       function getAdminSupabaseId(order) {
-          return String(order?.supabaseId || order?.dbId || order?.raw?.id || '').trim();
+          const candidate = order?.supabaseId || order?.dbId || order?.raw?.id || order?.id || '';
+          return String(candidate || '').trim();
       }
 
       function escapeAttribute(value) {
@@ -441,24 +441,41 @@
           }
 
           try {
+              let deleteResult = null;
               if (window.SDRSSupabase && typeof window.SDRSSupabase.deleteDeliveryRecord === 'function') {
+                  const isSupabaseConfigured = typeof window.SDRSSupabase.isConfigured === 'function' ? window.SDRSSupabase.isConfigured() : true;
+                  if (!isSupabaseConfigured) {
+                      throw new Error('Supabase is not configured.');
+                  }
+
                   if (normalizedSupabaseId) {
-                      await window.SDRSSupabase.safeCall(
+                      deleteResult = await window.SDRSSupabase.safeCall(
                           '[SUPABASE] delete delivery record by primary key',
                           () => window.SDRSSupabase.deleteDeliveryRecord(normalizedSupabaseId, { bySupabaseId: true })
                       );
                   } else {
-                      await window.SDRSSupabase.safeCall(
+                      deleteResult = await window.SDRSSupabase.safeCall(
                           '[SUPABASE] delete delivery record by transfer id',
                           () => window.SDRSSupabase.deleteDeliveryRecord(normalizedRecordId)
                       );
+                  }
+
+                  console.log('[ADMIN DELETE] deleteResult', deleteResult);
+
+                  if (!Array.isArray(deleteResult)) {
+                      throw new Error('Supabase delete returned unexpected response.');
+                  }
+                  if (deleteResult.length === 0) {
+                      throw new Error('No matching Supabase record found for deletion.');
                   }
               }
 
               adminRecords = adminRecords.filter((order) => {
                   const orderRecordId = getAdminOrderId(order);
                   const orderSupabaseId = getAdminSupabaseId(order);
-                  return orderRecordId !== normalizedRecordId && orderSupabaseId !== normalizedSupabaseId;
+                  const matchesByRecordId = orderRecordId && orderRecordId === normalizedRecordId;
+                  const matchesBySupabaseId = normalizedSupabaseId && orderSupabaseId && orderSupabaseId === normalizedSupabaseId;
+                  return !matchesByRecordId && !matchesBySupabaseId;
               });
 
               const manager = window.SDRSStateManager;
@@ -484,7 +501,8 @@
               showToast('Record deleted successfully', true);
           } catch (error) {
               console.error('[ADMIN DELETE] failed', error);
-              showToast('Delete failed. Check console for details.', false);
+              const message = error?.message || 'Delete failed. Check console for details.';
+              showToast(message, false);
           }
       };
 

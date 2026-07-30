@@ -254,18 +254,22 @@
     if (!id) return null;
     const rows = await request(`?id=eq.${encodeURIComponent(id)}`, {
       method: 'DELETE',
-      headers: { Prefer: 'return=minimal' }
+      headers: { Prefer: 'return=representation' }
     });
-    return Array.isArray(rows) ? rows : null;
+    if (!Array.isArray(rows)) return null;
+    return rows;
   }
 
   async function deleteDeliveryRecordByTransferId(transferId) {
     if (!transferId) return null;
-    const rows = await request(`?transfer_id=eq.${encodeURIComponent(transferId)}`, {
+    const normalizedIdentifier = String(transferId).trim();
+    const query = `?or=(transfer_id.eq.${encodeURIComponent(normalizedIdentifier)},order_id.eq.${encodeURIComponent(normalizedIdentifier)})`;
+    const rows = await request(query, {
       method: 'DELETE',
-      headers: { Prefer: 'return=minimal' }
+      headers: { Prefer: 'return=representation' }
     });
-    return Array.isArray(rows) ? rows : null;
+    if (!Array.isArray(rows)) return null;
+    return rows;
   }
 
   async function deleteDeliveryRecord(identifier, options = {}) {
